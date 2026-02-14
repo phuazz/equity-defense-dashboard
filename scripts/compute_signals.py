@@ -291,6 +291,31 @@ def compute_all(all_data: dict) -> dict:
                            "spy": 100 if sc == 0 else 50 if sc == 1 else 0,
                            "ief": 0 if sc == 0 else 50 if sc == 1 else 100})
     monitor["allocHist"] = alloc_hist
+    
+    # Composite regime transitions (entry/exit events for chart annotation)
+    transitions = []
+    prev_def = rolling[0]["compositeScore"] >= 2
+    for i in range(1, len(rolling)):
+        curr_def = rolling[i]["compositeScore"] >= 2
+        if curr_def and not prev_def:
+            transitions.append({"date": rolling[i]["date"], "type": "entry", "spx": rolling[i]["spx"], "score": rolling[i]["compositeScore"]})
+        elif not curr_def and prev_def:
+            transitions.append({"date": rolling[i]["date"], "type": "exit", "spx": rolling[i]["spx"], "score": rolling[i]["compositeScore"]})
+        prev_def = curr_def
+    monitor["transitions"] = transitions
+    
+    # Historical ranges for signal bars (min/max/percentiles over full history)
+    stress_vals = [r["rolling8d"] for r in rolling if r["rolling8d"] is not None]
+    monitor["ranges"] = {
+        "stress": {"min": min(stress_vals), "max": max(stress_vals), 
+                   "p25": sorted(stress_vals)[len(stress_vals)//4],
+                   "p75": sorted(stress_vals)[3*len(stress_vals)//4],
+                   "median": sorted(stress_vals)[len(stress_vals)//2]},
+    }
+    if rolling[-1]["spy12mRet"] is not None:
+        mom_vals = [r["spy12mRet"] for r in rolling if r["spy12mRet"] is not None]
+        monitor["ranges"]["mom12m"] = {"min": min(mom_vals), "max": max(mom_vals),
+                                        "median": sorted(mom_vals)[len(mom_vals)//2]}
 
     # ─── QC ───
     qc = run_qc(all_data, rolling, signals, bt, metrics)
