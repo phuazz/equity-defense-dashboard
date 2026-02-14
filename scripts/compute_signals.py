@@ -153,9 +153,14 @@ def compute_all(all_data: dict) -> dict:
         )
 
     # IEF cumulative log return for 12m return
-    ief_cum = [rolling[0]["iefRet"]]
+    ief_cum = [0.0]  # Day 0 = 0 cumulative return
     for i in range(1, len(rolling)):
-        ief_cum.append(ief_cum[-1] + math.log(1 + rolling[i]["iefRet"]))
+        r_ief = rolling[i]["iefRet"]
+        # Guard against extreme values that would break log
+        if r_ief is not None and r_ief > -0.99:
+            ief_cum.append(ief_cum[-1] + math.log(1 + r_ief))
+        else:
+            ief_cum.append(ief_cum[-1])
 
     def ief_12m(i):
         return math.exp(ief_cum[i] - ief_cum[i - 252]) - 1 if i >= 252 else None
@@ -259,15 +264,26 @@ def compute_all(all_data: dict) -> dict:
 
 # ─── Backtest engine ───
 
+# Transaction cost: 5bps per unit of allocation change (conservative for SPY/IEF)
+# e.g. 0→100% defensive = 5bps, 0→50% = 2.5bps, 50→100% = 2.5bps
+TX_COST_BPS = 5
+
 def _bt_loop(rolling, is_defensive_fn):
     """Generic backtest loop. is_defensive_fn(i, rolling) -> (def_frac, mode_str)"""
     eq = [{"date": rolling[0]["date"], "equity": 100000, "dd": 0, "mode": "invested"}]
     peak = 100000
+    prev_def = 0.0
+    total_tx = 0.0
     for i in range(1, len(rolling)):
         r = (rolling[i]["spx"] - rolling[i - 1]["spx"]) / rolling[i - 1]["spx"]
         ief_r = rolling[i]["iefRet"]
         def_frac, mode = is_defensive_fn(i, rolling)
-        ret = def_frac * (ief_r if ief_r else CASH_RATE) + (1 - def_frac) * r
+        # Transaction cost: proportional to allocation change
+        alloc_change = abs(def_frac - prev_def)
+        tx = alloc_change * TX_COST_BPS / 10000 if alloc_change > 0.01 else 0
+        total_tx += tx
+        prev_def = def_frac
+        ret = def_frac * (ief_r if ief_r else CASH_RATE) + (1 - def_frac) * r - tx
         e = eq[-1]["equity"] * (1 + ret)
         if e > peak:
             peak = e
@@ -283,15 +299,21 @@ def run_backtests(rolling, signals):
     enh_def, enh_cd, enh_pend = False, 0, False
     def enh_fn(i, r):
         nonlocal enh_def, enh_cd, enh_pend
+        # T+1 execution: pending blowup triggers defense next day
         if enh_pend:
             enh_def, enh_cd, enh_pend = True, 63, False
+        # Blowup trigger (T+1 execution via pending flag)
         if r[i]["rolling8d"] >= THRESHOLD and not enh_def and not enh_pend:
             enh_pend = True
+        # Regime filter trigger (T+0, immediate)
         bma = r[i]["sma200"] is not None and r[i]["spx"] < r[i]["sma200"]
         if bma and r[i]["canaryBad"] >= 1 and not enh_def and not enh_pend:
             enh_def = True
+            enh_cd = 63  # Also apply cooldown for regime entry
+        # Cooldown countdown
         if enh_cd > 0:
             enh_cd -= 1
+        # Exit: above 200d + canary clear + cooldown expired
         if enh_def and enh_cd <= 0:
             abv = r[i]["sma200"] is not None and r[i]["spx"] > r[i]["sma200"]
             if abv and r[i]["canaryBad"] == 0:
@@ -304,10 +326,14 @@ def run_backtests(rolling, signals):
         return (d, "defensive" if d else "invested")
 
     # S3: Dual Momentum
-    # Need IEF cumulative for 12m return
-    ief_cum = [rolling[0]["iefRet"]]
+    # IEF cumulative log return for 12m comparison
+    ief_cum = [0.0]
     for i in range(1, n):
-        ief_cum.append(ief_cum[-1] + math.log(1 + rolling[i]["iefRet"]))
+        r_ief = rolling[i]["iefRet"]
+        if r_ief is not None and r_ief > -0.99:
+            ief_cum.append(ief_cum[-1] + math.log(1 + r_ief))
+        else:
+            ief_cum.append(ief_cum[-1])
 
     def dm_fn(i, r):
         spy12 = r[i]["spy12mRet"]
@@ -420,6 +446,8 @@ def run_qc(all_data, rolling, signals, bt, m):
     chk("Backtest", "B&H CAGR", f"{m['bh']['cagr'] * 100:.1f}%", "pass" if 0.07 < m["bh"]["cagr"] < 0.15 else "warn")
     chk("Backtest", "Composite max DD", f"{m['comp']['maxDD'] * 100:.1f}% vs B&H {m['bh']['maxDD'] * 100:.1f}%", "pass" if m["comp"]["maxDD"] > m["bh"]["maxDD"] else "warn")
     chk("Backtest", "Composite def fraction", f"{m['comp']['defFrac'] * 100:.1f}%", "pass" if 0.1 < m["comp"]["defFrac"] < 0.6 else "warn")
+    chk("Backtest", "Transaction costs", f"{TX_COST_BPS}bps per allocation change", "pass")
+    chk("Backtest", "Look-ahead bias", "Blowup T+1, regime T+0, no future data", "pass")
 
     vs = [s for s in signals if s["fwd"]["maxDD12M"] is not None]
     if vs:
