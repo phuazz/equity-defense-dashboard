@@ -82,15 +82,17 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 .alloc-bar div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace}
 .alloc-spy{background:#2563eb;color:#fff}.alloc-ief{background:#15803d;color:#fff}.alloc-label{margin-top:4px;font-size:11px;color:var(--t3);display:flex;justify-content:space-between}
 .sig-bar-card{background:var(--cd);border:1px solid var(--b);border-radius:10px;padding:12px 14px;margin:6px 0}
-.sig-bar-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sig-bar-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
 .sig-bar-name{font-weight:700;font-size:13px}
 .sig-bar-badge{display:flex;align-items:center;gap:6px}
 .sig-bar-val{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--t2)}
-.sig-bar-track{position:relative;height:8px;background:var(--b);border-radius:4px;overflow:visible;margin:4px 0}
-.sig-bar-fill{height:100%;border-radius:4px;transition:width .3s}
-.sig-bar-thresh{position:absolute;top:-3px;height:14px;width:2px;background:var(--t1);border-radius:1px;z-index:2}
-.sig-bar-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:2px}
-.sig-bar-note{font-size:11px;color:var(--t2);margin-top:3px}
+.sig-bar-desc{font-size:11px;color:var(--t3);margin-bottom:6px}
+.sig-range{position:relative;height:8px;border-radius:4px;overflow:visible;margin:4px 0}
+.sig-range-bg{position:absolute;inset:0;border-radius:4px}
+.sig-dot{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;border:2px solid #fff;transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:3}
+.sig-thresh{position:absolute;top:-4px;height:16px;width:2px;border-radius:1px;z-index:2;background:var(--t1);opacity:.7}
+.sig-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:3px;font-family:'IBM Plex Mono',monospace}
+.sig-note{font-size:11px;margin-top:4px;font-weight:500}
 ::-webkit-scrollbar{width:5px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
 </style>
 </head>
@@ -172,50 +174,62 @@ $('#regime-hero').innerHTML='<div class="regime '+rc+'" style="padding:16px 8px 
 var spyPct=cs===0?100:cs===1?50:0,iefPct=100-spyPct;
 $('#mon-alloc').innerHTML='<div class="alloc-bar">'+(spyPct>0?'<div class="alloc-spy" style="width:'+spyPct+'%">SPY '+spyPct+'%</div>':'')+(iefPct>0?'<div class="alloc-ief" style="width:'+iefPct+'%">IEF '+iefPct+'%</div>':'')+'</div><div class="alloc-label"><span>Equities</span><span>Defensive</span></div>';
 
-// SPX recent chart (last ~252 trading days) with 200d MA and stress events
+// SPX chart with entry (red ▼) and exit (green ▲) annotations
 var r12=R.slice(Math.max(0,R.length-252));
 var sig12=SIG.filter(function(s){return s.date>=r12[0].date});
+var trans12=(MON.transitions||[]).filter(function(t){return t.date>=r12[0].date});
+var entries12=trans12.filter(function(t){return t.type==='entry'});
+var exits12=trans12.filter(function(t){return t.type==='exit'});
 Plotly.newPlot('ch-spx-recent',[
   {x:r12.map(function(r){return r.date}),y:r12.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPX',line:{color:'#2563eb',width:lw+.5}},
   {x:r12.filter(function(r){return r.sma200!=null}).map(function(r){return r.date}),y:r12.filter(function(r){return r.sma200!=null}).map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1,dash:'dot'}},
-  {x:sig12.map(function(s){return s.date}),y:sig12.map(function(s){return s.spx}),type:'scatter',mode:'markers',name:'Stress',marker:{color:'#dc2626',size:M?8:12,symbol:'triangle-down',line:{color:'#fff',width:1}}}
+  {x:sig12.map(function(s){return s.date}),y:sig12.map(function(s){return s.spx}),type:'scatter',mode:'markers',name:'Stress Signal',marker:{color:'#dc2626',size:M?8:11,symbol:'triangle-down',line:{color:'#fff',width:1}}},
+  {x:entries12.map(function(t){return t.date}),y:entries12.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def Entry',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
+  {x:exits12.map(function(t){return t.date}),y:exits12.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def Exit',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
 ],PL(),PC);
 
-// Signal range bars — each shows current value position relative to threshold
+// Signal range bars — iOS Weather-style gradient with dot indicator
 var px=MON.proximity||{};
-function sigBar(name,desc,value,valLabel,threshold,threshLabel,maxRange,isTriggered,invert){
-  // invert: true means "below threshold = triggered" (like MA signals)
-  var fillPct=maxRange>0?Math.min(Math.abs(value)/maxRange*100,100):0;
-  var threshPct=maxRange>0?Math.min(threshold/maxRange*100,100):0;
-  var dist=invert?(value-threshold)/Math.abs(threshold||1):(value-threshold)/Math.abs(threshold||1);
-  var near=!isTriggered&&Math.abs(dist)<0.05;
-  var fillCol=isTriggered?'#dc2626':near?'#b45309':'#2563eb';
-  var badge=isTriggered?'<span class="bg bg-r">RISK</span>':'<span class="bg bg-g">OK</span>';
-  var note='';
-  if(isTriggered){note='<div class="sig-bar-note neg">⚠ Signal triggered</div>'}
-  else if(near){note='<div class="sig-bar-note" style="color:var(--amb)">⚠ '+Math.abs(dist*100).toFixed(1)+'% from trigger</div>'}
-  else{note='<div class="sig-bar-note">'+Math.abs(dist*100).toFixed(1)+'% buffer to trigger</div>'}
-  return '<div class="sig-bar-card"><div class="sig-bar-hd"><span class="sig-bar-name">'+name+'</span><div class="sig-bar-badge">'+badge+' <span class="sig-bar-val">'+valLabel+'</span></div></div><div style="font-size:11px;color:var(--t2);margin-bottom:4px">'+desc+'</div><div class="sig-bar-track"><div class="sig-bar-fill" style="width:'+fillPct+'%;background:'+fillCol+'"></div><div class="sig-bar-thresh" style="left:'+threshPct+'%"></div></div><div class="sig-bar-labels"><span>0</span><span style="position:relative;left:'+(threshPct-50)+'%">▼ '+threshLabel+'</span><span>'+maxRange+'</span></div>'+note+'</div>';
+function rangeBar(name,desc,valLabel,dotPct,threshPct,gradient,noteText,noteColor){
+  return '<div class="sig-bar-card"><div class="sig-bar-hd"><span class="sig-bar-name">'+name+'</span><span class="sig-bar-val">'+valLabel+'</span></div><div class="sig-bar-desc">'+desc+'</div><div class="sig-range"><div class="sig-range-bg" style="background:'+gradient+'"></div>'+(threshPct!=null?'<div class="sig-thresh" style="left:'+threshPct+'%"></div>':'')+'<div class="sig-dot" style="left:'+dotPct+'%;background:'+noteColor+'"></div></div><div class="sig-note" style="color:'+noteColor+'">'+noteText+'</div></div>';
 }
-var si=function(v){return v?'<span class="bg bg-r">RISK</span>':'<span class="bg bg-g">OK</span>'};
 var sigHtml='';
-// 1. Stress count: 0-250 range, threshold at 115
-sigHtml+=sigBar('8-Day Stress Count','Stocks down ≥7% in 8 trading days',last.rolling8d,last.rolling8d+'',115,'115',250,ba,false);
-// 2. 200d MA: show SPX as % of 200d MA, threshold at 100%
+
+// 1. Stress count: 0→250, threshold 115. Green when low, red when high.
+var stPct=Math.min(last.rolling8d/250*100,100);
+var stThPct=115/250*100;
+var stBuf=((115-last.rolling8d)/115*100).toFixed(0);
+var stCol=ba?'#dc2626':last.rolling8d>80?'#b45309':'#15803d';
+sigHtml+=rangeBar('8-Day Stress Count','Number of stocks down ≥7% in 8 trading days',last.rolling8d+' / 115',stPct,stThPct,'linear-gradient(90deg, #15803d 0%, #65a30d 30%, #b45309 46%, #dc2626 60%, #7f1d1d 100%)',ba?'⚠ ABOVE threshold — signal triggered':stBuf+'% buffer to threshold',stCol);
+
+// 2. 200d MA: SPX position relative to MA. Show as % ratio.
 var ma2v=px.sma200||{};
-var ma2ratio=ma2v.ma?last.spx/ma2v.ma*100:100;
-sigHtml+=sigBar('200-Day Moving Average','SPX vs 200d MA — below = bearish regime',Math.round(ma2ratio),fmt(last.spx,0)+' vs '+fmt(ma2v.ma,0),100,'100%',120,b2,true);
-// 3. Canary: 0-2, threshold at 1
-sigHtml+=sigBar('Canary Assets (VWO/BND)','Keller 13612W momentum — negative = risk off',last.canaryBad,last.canaryBad+'/'+last.canaryTotal+' neg',1,'≥1',2,cb,false);
-// 4. 12M momentum: show as %, threshold at 0
+var ma2pct=ma2v.pct!=null?ma2v.pct:0;
+var ma2ratio=ma2v.ma?last.spx/ma2v.ma:1;
+var ma2dot=Math.min(Math.max((ma2ratio-0.85)/(1.15-0.85)*100,0),100);
+var ma2thPct=(1.0-0.85)/(1.15-0.85)*100;
+var ma2col=b2?'#dc2626':Math.abs(ma2pct)<0.03?'#b45309':'#15803d';
+sigHtml+=rangeBar('200-Day Moving Average','SPX position vs 200d MA — below triggers bear regime',fmt(last.spx,0)+' vs '+fmt(ma2v.ma,0)+' ('+(ma2pct>0?'+':'')+(ma2pct*100).toFixed(1)+'%)',ma2dot,ma2thPct,'linear-gradient(90deg, #dc2626 0%, #b45309 40%, #65a30d 50%, #15803d 70%, #15803d 100%)',b2?'⚠ BELOW 200d MA — bearish regime':Math.abs(ma2pct)<0.03?'⚠ Only '+(ma2pct*100).toFixed(1)+'% above — watch closely':(ma2pct*100).toFixed(1)+'% above MA',ma2col);
+
+// 3. Canary: 0/2 = safe, 1/2 or 2/2 = risk
+var canDot=last.canaryBad/2*100;
+var canCol=cb?'#dc2626':'#15803d';
+sigHtml+=rangeBar('Canary Assets','VWO + BND momentum (Keller 13612W) — ≥1 negative = risk off',last.canaryBad+'/'+last.canaryTotal+' negative',canDot,50,'linear-gradient(90deg, #15803d 0%, #15803d 40%, #b45309 50%, #dc2626 70%, #dc2626 100%)',cb?'⚠ Cross-asset stress detected':'Both assets positive — no cross-asset stress',canCol);
+
+// 4. 12M momentum: centered at 0, range -40% to +40%
 var m12val=last.spy12mRet!=null?last.spy12mRet*100:0;
-var m12range=40;
-var m12fill=Math.min(Math.abs(m12val)/m12range*100,100);
-sigHtml+='<div class="sig-bar-card"><div class="sig-bar-hd"><span class="sig-bar-name">12-Month Momentum</span><div class="sig-bar-badge">'+si(sn)+' <span class="sig-bar-val">'+pct(last.spy12mRet)+'</span></div></div><div style="font-size:11px;color:var(--t2);margin-bottom:4px">SPY 12M total return — negative = risk off</div><div class="sig-bar-track"><div class="sig-bar-fill" style="width:'+m12fill+'%;background:'+(sn?'#dc2626':m12val<3?'#b45309':'#2563eb')+'"></div><div class="sig-bar-thresh" style="left:50%"></div></div><div class="sig-bar-labels"><span>-'+m12range+'%</span><span>▼ 0%</span><span>+'+m12range+'%</span></div><div class="sig-bar-note">'+(sn?'<span class="neg">⚠ Negative momentum</span>':m12val<3?'<span style="color:var(--amb)">⚠ '+m12val.toFixed(1)+'% — near zero</span>':m12val.toFixed(1)+'% above zero')+'</div></div>';
+var m12dot=Math.min(Math.max((m12val+40)/80*100,0),100);
+var m12col=sn?'#dc2626':m12val<3?'#b45309':'#15803d';
+sigHtml+=rangeBar('12-Month Momentum','SPY trailing 12M total return — negative = risk off',pct(last.spy12mRet),m12dot,50,'linear-gradient(90deg, #dc2626 0%, #b45309 40%, #65a30d 50%, #15803d 60%, #15803d 100%)',sn?'⚠ Negative — absolute momentum risk off':m12val<3?'⚠ Only +'+m12val.toFixed(1)+'% — close to flipping':'+'+m12val.toFixed(1)+'% — healthy positive momentum',m12col);
+
 // 5. 10M SMA
 var ma10v=px.sma10m||{};
-var ma10ratio=ma10v.ma?last.spx/ma10v.ma*100:100;
-sigHtml+=sigBar('10-Month SMA (Faber)','Monthly timing signal — below = defensive',Math.round(ma10ratio),fmt(last.spx,0)+' vs '+fmt(ma10v.ma,0),100,'100%',120,b10,true);
+var ma10pct=ma10v.pct!=null?ma10v.pct:0;
+var ma10ratio=ma10v.ma?last.spx/ma10v.ma:1;
+var ma10dot=Math.min(Math.max((ma10ratio-0.85)/(1.15-0.85)*100,0),100);
+var ma10thPct=(1.0-0.85)/(1.15-0.85)*100;
+var ma10col=b10?'#dc2626':Math.abs(ma10pct)<0.03?'#b45309':'#15803d';
+sigHtml+=rangeBar('10-Month SMA (Faber)','Monthly timing — below triggers defensive allocation',fmt(last.spx,0)+' vs '+fmt(ma10v.ma,0)+' ('+(ma10pct>0?'+':'')+(ma10pct*100).toFixed(1)+'%)',ma10dot,ma10thPct,'linear-gradient(90deg, #dc2626 0%, #b45309 40%, #65a30d 50%, #15803d 70%, #15803d 100%)',b10?'⚠ BELOW 10M SMA — Faber defensive':Math.abs(ma10pct)<0.03?'⚠ Only '+(ma10pct*100).toFixed(1)+'% above — watch closely':(ma10pct*100).toFixed(1)+'% above SMA',ma10col);
 $('#mon-sig').innerHTML=sigHtml;
 
 // Regime context
