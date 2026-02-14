@@ -78,6 +78,12 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 .sa-s{font-size:10px;color:var(--t2)}
 @media(min-width:768px){.sa-l{font-size:10px}.sa-v{font-size:24px}}
 .cmp th{background:var(--blu-bg);color:var(--blu)}
+.alloc-bar{display:flex;height:36px;border-radius:8px;overflow:hidden;margin:6px 0;border:1px solid var(--b)}
+.alloc-bar div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.alloc-spy{background:#2563eb;color:#fff}.alloc-ief{background:#15803d;color:#fff}.alloc-label{margin-top:4px;font-size:11px;color:var(--t3);display:flex;justify-content:space-between}
+.prox-bar-wrap{height:4px;background:var(--b);border-radius:2px;margin-top:4px;position:relative;overflow:visible}
+.prox-bar{height:100%;border-radius:2px;transition:width .3s}
+.prox-marker{position:absolute;top:-3px;width:2px;height:10px;background:var(--t1);border-radius:1px}
 ::-webkit-scrollbar{width:5px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
 </style>
 </head>
@@ -87,7 +93,19 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div class="tabs"><div class="tabs-inner">
 <button class="tab on" data-t="t-mon">Monitor</button><button class="tab" data-t="t-ov">Overview</button><button class="tab" data-t="t-cmp">Compare</button><button class="tab" data-t="t-sig">Signals</button><button class="tab" data-t="t-str">Strategies</button><button class="tab" data-t="t-ev">Events</button><button class="tab" data-t="t-rsk">Risk</button><button class="tab" data-t="t-qc">QC</button>
 </div></div>
-<div class="pnl on" id="t-mon"><div id="regime-hero"></div><div class="g g3" id="mon-cards"></div><div class="sec" style="font-size:14px">5 Risk Signals</div><div class="cd" id="mon-sig"></div><div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div></div>
+<div class="pnl on" id="t-mon">
+<div id="regime-hero"></div>
+<div class="g g3" id="mon-cards"></div>
+<div class="sec" style="font-size:14px">Current Allocation</div>
+<div id="mon-alloc"></div>
+<div class="sec" style="font-size:14px">5 Risk Signals — Proximity to Trigger</div>
+<div class="cd" id="mon-sig"></div>
+<div class="sec" style="font-size:14px">Regime Context</div>
+<div class="cd" id="mon-context"></div>
+<div class="ch"><div class="ch-t">Score Distribution (% of all days)</div><div id="ch-sdist" style="height:140px"></div></div>
+<div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
+<div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
+</div>
 <div class="pnl" id="t-ov"><div class="g g4" id="ov-cards"></div><div class="ch"><div class="ch-t">S&P 500 Total Return + Stress Events</div><div id="ch-eq" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">Drawdown — All Strategies</div><div id="ch-dd" style="height:220px"></div></div><div class="ch"><div class="ch-t">8-Day Stress Count</div><div id="ch-bu" style="height:220px"></div></div></div><div class="ch"><div class="ch-t">Equity Curves (Log)</div><div id="ch-st" style="height:300px"></div></div></div>
 <div class="pnl" id="t-cmp"><div class="sec">Strategy Comparison</div><div class="tbl" id="cmp-tbl"></div><div class="ch"><div class="ch-t">Annual Returns</div><div id="ch-ann" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">DD: Composite vs B&H</div><div id="ch-ddc" style="height:220px"></div></div><div class="ch"><div class="ch-t">Defensive Allocation %</div><div id="ch-alloc" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-sig"><div class="sec">Forward Returns After Stress Events</div><div class="box">What happens after a stress signal fires? <strong id="sig-n">—</strong> historical events analyzed across 1–12 month horizons.</div><div id="sig-cards" class="sa"></div><div class="sec" style="font-size:14px">Per-Event Returns</div><div class="tbl" id="sig-tbl"></div><div class="ch"><div class="ch-t">Forward Paths (12M)</div><div id="ch-fwd" style="height:260px"></div></div><div class="box" id="sig-interp"></div><div class="g g2"><div class="ch"><div class="ch-t">Max DD Distribution</div><div id="ch-fdd" style="height:220px"></div></div><div class="ch"><div class="ch-t">Distance from ATH at Signal</div><div id="ch-ath" style="height:220px"></div></div></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="sig-stats"></div></div>
@@ -110,22 +128,64 @@ const PC=M?{responsive:true,displayModeBar:false,scrollZoom:false,staticPlot:tru
 const lw=M?1:1.5;
 
 function render(D){
-const{rolling:R,signals:SIG,bt:BT,m:MET,qc:QC,allData:AD}=D;
+const{rolling:R,signals:SIG,bt:BT,m:MET,qc:QC,allData:AD,monitor:MOND}=D;
 const last=R[R.length-1];
 const STR=[{k:'enh',n:'Enhanced',c:'#dc2626'},{k:'fab',n:'Faber',c:'#7c3aed',d:'dot'},{k:'dm',n:'DualMom',c:'#b45309',d:'dashdot'},{k:'comp',n:'Composite',c:'#15803d'},{k:'bh',n:'B&H',c:'#8e95a5'}];
 $('#hd-period').textContent=R[0].date+' → '+last.date;
 $('#hd-updated').textContent=SIG.length+' stress events · Score '+last.compositeScore+'/5';
 
 // MONITOR
+var MON=MOND||{};
 var ba=last.rolling8d>=115,b2=last.sma200!=null&&last.spx<last.sma200,cb=last.canaryBad>=1,sn=last.spy12mNeg,b10=last.belowSMA10m;
 var cs=last.compositeScore,rc=cs>=3?'r-d':cs>=1?'r-w':'r-s';
 var rl=cs>=3?'HIGH RISK':cs>=2?'ELEVATED':cs===1?'CAUTION':'ALL CLEAR';
 var ra=cs>=2?'Full Defensive — 100% IEF':cs===1?'Partial — 50% IEF / 50% SPY':'Fully Invested — 100% SPY';
-var sc=cs>=3?'var(--red)':cs>=1?'var(--amb)':'var(--grn)';
-$('#regime-hero').innerHTML='<div class="regime '+rc+'"><div class="regime-score" style="color:'+sc+'">'+cs+'<span style="font-size:24px;font-weight:400;color:var(--t3)">/5</span></div><div class="regime-label" style="color:'+sc+'">'+rl+'</div><div class="regime-action"><strong>'+last.date+'</strong> — '+ra+'</div></div>';
+var scol=cs>=3?'var(--red)':cs>=1?'var(--amb)':'var(--grn)';
+$('#regime-hero').innerHTML='<div class="regime '+rc+'"><div class="regime-score" style="color:'+scol+'">'+cs+'<span style="font-size:24px;font-weight:400;color:var(--t3)">/5</span></div><div class="regime-label" style="color:'+scol+'">'+rl+'</div><div class="regime-action"><strong>'+last.date+'</strong> — '+ra+'</div></div>';
 $('#mon-cards').innerHTML=[{t:'S&P 500',v:fmt(last.spx,0),s:(last.aboveSMA200?'Above':'Below')+' 200d MA'},{t:'8-Day Stress',v:last.rolling8d,c:ba?'neg':'pos',s:'Threshold: 115'},{t:'12M Return',v:pct(last.spy12mRet),c:last.spy12mRet>=0?'pos':'neg',s:'SPY total return'}].map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v '+(c.c||'')+'">'+c.v+'</div><div class="cd-s">'+c.s+'</div></div>'}).join('');
+
+// Allocation bar
+var spyPct=cs===0?100:cs===1?50:0,iefPct=100-spyPct;
+$('#mon-alloc').innerHTML='<div class="alloc-bar">'+(spyPct>0?'<div class="alloc-spy" style="width:'+spyPct+'%">SPY '+spyPct+'%</div>':'')+(iefPct>0?'<div class="alloc-ief" style="width:'+iefPct+'%">IEF '+iefPct+'%</div>':'')+'</div><div class="alloc-label"><span>Equities</span><span>Defensive</span></div>';
+
+// Proximity signals - show how far each is from flipping
+var px=MON.proximity||{};
+function proxBar(val,thresh,isBelow){var dist=thresh?Math.abs((val-thresh)/thresh):0;var pctW=Math.min(dist*100/15,100);var near=dist<0.03;var col=near?'var(--amb)':'var(--grn)';if(isBelow)col='var(--red)';return '<div class="prox-bar-wrap"><div class="prox-bar" style="width:'+pctW+'%;background:'+col+'"></div></div>'}
 var si=function(v){return v?'<span class="bg bg-r">RISK</span>':'<span class="bg bg-g">OK</span>'};
-$('#mon-sig').innerHTML=[{n:'Stress Count ≥ 115',v:si(ba),d:last.rolling8d},{n:'SPX below 200d MA',v:si(b2),d:fmt(last.spx,0)+' vs '+(last.sma200?fmt(last.sma200,0):'—')},{n:'Canary (VWO/BND)',v:si(cb),d:last.canaryBad+'/'+last.canaryTotal},{n:'SPY 12M Return < 0',v:si(sn),d:last.spy12mRet!=null?pct(last.spy12mRet):'—'},{n:'SPX below 10M SMA',v:si(b10),d:last.sma10m?fmt(last.sma10m,0):'—'}].map(function(s){return '<div class="sig-row"><span class="sig-name">'+s.n+'</span><span class="sig-val">'+s.v+' <span class="mono" style="color:var(--t3);font-size:11px">'+s.d+'</span></span></div>'}).join('');
+var sigs=[];
+// Stress
+var stDist=last.rolling8d+'/115';
+sigs.push({n:'Stress Count',v:si(ba),d:stDist,prox:ba?'<span class="neg" style="font-size:11px">ABOVE threshold</span>':'<span style="font-size:11px;color:var(--t3)">'+(115-last.rolling8d)+' below threshold</span>'});
+// 200d MA
+var ma2d=px.sma200||{};
+var ma2pct=ma2d.pct!=null?ma2d.pct:0;
+sigs.push({n:'200d MA',v:si(b2),d:fmt(last.spx,0)+' vs '+fmt(ma2d.ma,0),prox:'<span style="font-size:11px;color:'+(Math.abs(ma2pct)<0.03?'var(--amb)':'var(--t3)')+'">'+pct(ma2pct,1)+(Math.abs(ma2pct)<0.03?' ⚠ close':'')+'</span>'});
+// Canary
+sigs.push({n:'Canary (VWO/BND)',v:si(cb),d:last.canaryBad+'/'+last.canaryTotal+' negative',prox:cb?'<span class="neg" style="font-size:11px">Cross-asset stress</span>':'<span style="font-size:11px;color:var(--t3)">Both positive</span>'});
+// 12M
+var m12=last.spy12mRet;
+sigs.push({n:'12M Momentum',v:si(sn),d:pct(m12),prox:'<span style="font-size:11px;color:'+(m12!=null&&m12<0.03&&m12>0?'var(--amb)':'var(--t3)')+'">'+( m12!=null&&m12>0&&m12<0.03?'⚠ near zero':'')+(m12!=null&&m12<0?'Negative — risk off':'')+(m12!=null&&m12>=0.03?'Healthy':'')+(m12==null?'—':'')+'</span>'});
+// 10M SMA
+var ma10=px.sma10m||{};
+var ma10pct=ma10.pct!=null?ma10.pct:0;
+sigs.push({n:'10M SMA',v:si(b10),d:fmt(last.spx,0)+' vs '+fmt(ma10.ma,0),prox:'<span style="font-size:11px;color:'+(Math.abs(ma10pct)<0.03?'var(--amb)':'var(--t3)')+'">'+pct(ma10pct,1)+(Math.abs(ma10pct)<0.03?' ⚠ close':'')+'</span>'});
+$('#mon-sig').innerHTML=sigs.map(function(s){return '<div class="sig-row" style="flex-wrap:wrap"><div style="display:flex;justify-content:space-between;width:100%;align-items:center"><span class="sig-name">'+s.n+'</span><span class="sig-val">'+s.v+' <span class="mono" style="color:var(--t3);font-size:11px">'+s.d+'</span></span></div><div style="width:100%;padding-top:2px">'+s.prox+'</div></div>'}).join('');
+
+// Regime context
+var rd=MON.regimeDays||0;
+var ad=MON.avgDuration||[0,0,0,0,0,0];
+var sd=MON.scoreDist||[0,0,0,0,0,0];
+$('#mon-context').innerHTML='<div class="qi"><span>Current regime</span><span class="mono"><strong>Score '+cs+'</strong> for <strong>'+rd+'</strong> days</span></div><div class="qi"><span>Avg duration at score '+cs+'</span><span class="mono">'+ad[cs]+' days</span></div><div class="qi"><span>% of history at score 0 (all clear)</span><span class="mono">'+(sd[0]*100).toFixed(1)+'%</span></div><div class="qi"><span>% of history at score ≥2 (defensive)</span><span class="mono">'+((sd[2]+sd[3]+sd[4]+sd[5])*100).toFixed(1)+'%</span></div>';
+
+// Score distribution chart
+var sdLabels=['0\nClear','1\nWatch','2\nElev','3\nHigh','4','5\nMax'];
+var sdColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626'];
+Plotly.newPlot('ch-sdist',[{x:sdLabels,y:sd.map(function(v){return v*100}),type:'bar',marker:{color:sdColors},text:sd.map(function(v){return (v*100).toFixed(1)+'%'}),textposition:'outside',textfont:{size:M?9:11}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{title:'% of days'}),margin:Object.assign({},PL().margin,{b:M?40:50})}),PC);
+
+// Allocation history (2Y sparkline)
+var ah=MON.allocHist||[];
+if(ah.length>0){Plotly.newPlot('ch-ahist',[{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.spy}),type:'scatter',fill:'tozeroy',name:'SPY%',line:{color:'#2563eb',width:0},fillcolor:'rgba(37,99,235,.25)'},{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.ief}),type:'scatter',name:'IEF%',line:{color:'#15803d',width:1},fillcolor:'rgba(22,163,74,.1)'}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,105]})}),PC)}
+
 Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,5.3]})}),PC);
 
 // OVERVIEW
@@ -200,7 +260,7 @@ function main(){
     if(typeof PRECOMPUTED_DATA==='undefined') throw new Error('No data — run pipeline.py');
     var d=PRECOMPUTED_DATA;
     setBar(60);setStatus('Rendering…');
-    render({rolling:d.rolling,signals:d.signals,bt:d.bt,m:d.metrics,qc:d.qc,allData:{meta:d.meta}});
+    render({rolling:d.rolling,signals:d.signals,bt:d.bt,m:d.metrics,qc:d.qc,allData:{meta:d.meta},monitor:d.monitor||{}});
     setBar(100);log('✅ Ready');
     try{$('#cache-status').textContent='Updated: '+d.meta.endDate}catch(e){}
     setTimeout(function(){$('#loading').style.opacity='0';$('#loading').style.transition='opacity .35s';setTimeout(function(){$('#loading').style.display='none'},350)},200);
