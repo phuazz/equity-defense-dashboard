@@ -2,472 +2,194 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<title>Equity Defense Dashboard — Multi-Strategy Signal Monitor</title>
+<title>S&P 500 Risk Overlay — Defensive Regime Monitor</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#fff;--surface:#f8f9fa;--card:#fff;--border:#e2e5e9;
-  --t1:#1a1a2e;--t2:#555b6e;--t3:#8e95a5;
-  --green:#15803d;--green-bg:rgba(22,163,74,.06);
-  --red:#dc2626;--red-bg:rgba(220,38,38,.05);
-  --blue:#2563eb;--blue-bg:rgba(37,99,235,.05);
-  --amber:#b45309;--amber-bg:rgba(180,83,9,.05);
-  --cyan:#0891b2;--purple:#7c3aed;
-}
-html{font-size:15px}
-body{font-family:'Source Sans 3',system-ui,sans-serif;background:var(--bg);color:var(--t1);line-height:1.65;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
-.mono{font-family:'IBM Plex Mono',monospace;font-size:.88em}
-
-#loading{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
-#loading h2{font-family:'Source Serif 4',serif;font-size:22px;font-weight:600;text-align:center}
-#load-bar-wrap{width:min(360px,85vw);height:4px;background:var(--border);border-radius:2px;overflow:hidden}
-#load-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .3s}
-#load-status{color:var(--t2);font-size:13px}
-#load-log{color:var(--t3);font-size:11px;font-family:'IBM Plex Mono',monospace;max-height:100px;overflow-y:auto;width:min(480px,85vw);text-align:center;margin-top:8px}
-#cache-controls{margin-top:12px;display:flex;gap:8px;align-items:center}
-#cache-status{font-size:11px;color:var(--t3)}
-
-.masthead{background:var(--surface);border-bottom:1px solid var(--border);padding:16px}
-.masthead-inner{max-width:1480px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px}
-.masthead h1{font-family:'Source Serif 4',serif;font-size:clamp(17px,3.8vw,26px);font-weight:700;letter-spacing:-.5px}
-.masthead h1 em{font-style:italic;color:var(--red)}
-.masthead-sub{color:var(--t2);font-size:12px;margin-top:3px;max-width:700px;line-height:1.4}
-.masthead-meta{color:var(--t2);font-size:12px;text-align:right}
-.masthead-meta .mono{color:var(--t1)}
-@media(max-width:767px){.masthead-sub{display:none}.masthead-meta{font-size:11px}}
-@media(min-width:768px){.masthead{padding:24px 32px}}
-
-.tabs-bar{background:var(--bg);border-bottom:1px solid var(--border);padding:0 8px;position:sticky;top:0;z-index:100}
-.tabs-inner{max-width:1480px;margin:0 auto;display:flex;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
-.tabs-inner::-webkit-scrollbar{display:none}
-.tab-btn{background:none;border:none;color:var(--t3);font-family:'Source Sans 3',sans-serif;font-size:12px;font-weight:600;padding:10px 12px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:color .15s}
-.tab-btn:hover{color:var(--t1)}
-.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
-@media(min-width:768px){.tabs-bar{padding:0 32px}.tab-btn{font-size:13px;padding:12px 18px}}
-
-.tab-panel{display:none;max-width:1480px;margin:0 auto;padding:14px 12px 36px}
-.tab-panel.active{display:block}
-@media(min-width:768px){.tab-panel{padding:24px 32px 48px}}
-
-.grid{display:grid;gap:10px}
-.g2{grid-template-columns:1fr}
-.g3{grid-template-columns:1fr 1fr}
-.g4{grid-template-columns:1fr 1fr}
+:root{--bg:#fff;--sf:#f8f9fa;--cd:#fff;--b:#e2e5e9;--t1:#1a1a2e;--t2:#555b6e;--t3:#8e95a5;--grn:#15803d;--grn-bg:rgba(22,163,74,.06);--red:#dc2626;--red-bg:rgba(220,38,38,.05);--blu:#2563eb;--blu-bg:rgba(37,99,235,.05);--amb:#b45309;--amb-bg:rgba(180,83,9,.05);--pur:#7c3aed;--safe-b:env(safe-area-inset-bottom,0px)}
+html{font-size:15px}body{font-family:'Source Sans 3',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--t1);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;padding-bottom:var(--safe-b)}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:.86em}
+#loading{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+#loading h2{font-family:'Source Serif 4',serif;font-size:20px;font-weight:600;text-align:center}
+#load-bar-wrap{width:min(320px,80vw);height:3px;background:var(--b);border-radius:2px;overflow:hidden}
+#load-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--blu),#0891b2);transition:width .3s}
+#load-status{color:var(--t2);font-size:12px}#load-log{color:var(--t3);font-size:10px;font-family:'IBM Plex Mono',monospace;max-height:80px;overflow-y:auto;width:min(400px,85vw);text-align:center;margin-top:4px}
+#cache-controls{margin-top:8px}#cache-status{font-size:10px;color:var(--t3)}
+.hd{background:var(--sf);border-bottom:1px solid var(--b);padding:14px 16px 12px}
+.hd-inner{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.hd h1{font-family:'Source Serif 4',serif;font-size:clamp(16px,3.5vw,24px);font-weight:700;letter-spacing:-.4px}
+.hd h1 span{color:var(--t3);font-weight:400}
+.hd-right{text-align:right;font-size:11px;color:var(--t2)}.hd-right .mono{color:var(--t1);font-size:12px}
+@media(max-width:767px){.hd-right{font-size:10px}}
+@media(min-width:768px){.hd{padding:20px 32px 16px}}
+.tabs{background:var(--bg);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:100;padding:0 8px}
+.tabs-inner{max-width:1400px;margin:0 auto;display:flex;overflow-x:auto;scrollbar-width:none}.tabs-inner::-webkit-scrollbar{display:none}
+.tab{background:none;border:none;color:var(--t3);font-family:'Source Sans 3',sans-serif;font-size:12px;font-weight:600;padding:10px 10px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;-webkit-tap-highlight-color:transparent;min-height:44px;display:flex;align-items:center}
+.tab.on{color:var(--blu);border-bottom-color:var(--blu)}
+@media(min-width:768px){.tabs{padding:0 32px}.tab{font-size:13px;padding:12px 16px}}
+.pnl{display:none;max-width:1400px;margin:0 auto;padding:12px 12px 32px}.pnl.on{display:block}
+@media(min-width:768px){.pnl{padding:20px 32px 48px}}
+.g{display:grid;gap:8px}.g2{grid-template-columns:1fr}.g3{grid-template-columns:1fr 1fr}.g4{grid-template-columns:1fr 1fr}
 @media(min-width:600px){.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}}
-@media(min-width:768px){.g2{grid-template-columns:1fr 1fr}.grid{gap:16px}}
-
-.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
-.card-title{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-bottom:2px;font-weight:600}
-.card-value{font-size:20px;font-weight:700;letter-spacing:-.5px;font-family:'IBM Plex Mono',monospace}
-.card-sub{font-size:11px;color:var(--t2);margin-top:1px}
-@media(min-width:768px){.card{padding:16px 20px}.card-value{font-size:24px}}
-.positive{color:var(--green)}.negative{color:var(--red)}.neutral{color:var(--amber)}
-
-.section-title{font-family:'Source Serif 4',serif;font-size:17px;font-weight:600;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-@media(min-width:768px){.section-title{font-size:20px;margin:28px 0 14px}}
-
-.chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;margin:10px 0}
-.chart-label{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-bottom:4px;font-weight:600}
-@media(min-width:768px){.chart-wrap{padding:16px;margin:16px 0}.chart-label{font-size:11px}}
-
-.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px 0;border:1px solid var(--border);border-radius:8px}
-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
-thead th{text-align:left;padding:7px 8px;background:var(--surface);border-bottom:2px solid var(--border);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--t2);position:sticky;top:0;z-index:5}
-tbody td{padding:5px 8px;border-bottom:1px solid var(--border)}
-tbody tr:hover{background:rgba(37,99,235,.02)}
-@media(min-width:768px){table{font-size:13px}thead th{padding:10px 12px;font-size:11px}tbody td{padding:8px 12px}}
-
-.badge{display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace}
-.badge-danger{background:var(--red-bg);color:var(--red)}
-.badge-safe{background:var(--green-bg);color:var(--green)}
-.badge-warn{background:var(--amber-bg);color:var(--amber)}
-.badge-info{background:var(--blue-bg);color:var(--blue)}
-@media(min-width:768px){.badge{padding:2px 8px;font-size:11px}}
-
-.note-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin:10px 0;font-size:12px;color:var(--t2);line-height:1.6}
-.note-box strong{color:var(--t1)}
-@media(min-width:768px){.note-box{padding:16px;font-size:13px}}
-
-.improve-box{border:1px solid var(--green);border-radius:8px;padding:12px 14px;background:var(--green-bg);margin:10px 0}
-.improve-box h3{color:var(--green);font-size:13px;margin-bottom:4px;font-weight:700}
-.improve-box p{color:var(--t2);font-size:12px;line-height:1.6}
-@media(min-width:768px){.improve-box{padding:16px 20px}.improve-box h3{font-size:14px}.improve-box p{font-size:13px}}
-
-.qc-box{border:2px solid var(--amber);border-radius:8px;padding:14px;background:var(--amber-bg);margin:14px 0}
-.qc-box h3{color:var(--amber);font-size:15px;margin-bottom:8px;font-family:'Source Serif 4',serif;font-weight:700}
-.qc-item{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(180,83,9,.1);font-size:12px;gap:6px}
-.qc-item:last-child{border:none}
-.qc-item span:first-child{flex:1;min-width:0}
-.qc-item span:last-child{text-align:right;flex-shrink:0}
-@media(min-width:768px){.qc-item{font-size:13px}}
-.qc-pass{color:var(--green)}.qc-fail{color:var(--red)}.qc-warn{color:var(--amber)}
-
-.compare-table th{background:var(--blue-bg);color:var(--blue)}
-
-.sig-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
-@media(min-width:600px){.sig-summary{grid-template-columns:repeat(4,1fr)}}
-.sig-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
-.sig-card .label{font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);font-weight:600}
-.sig-card .val{font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin:2px 0}
-.sig-card .sub{font-size:10px;color:var(--t2)}
-@media(min-width:768px){.sig-card .label{font-size:10px}.sig-card .val{font-size:22px}.sig-card .sub{font-size:11px}}
-
-::-webkit-scrollbar{width:6px;height:4px}
-::-webkit-scrollbar-track{background:var(--surface)}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(min-width:768px){.g2{grid-template-columns:1fr 1fr}.g{gap:14px}}
+.cd{background:var(--cd);border:1px solid var(--b);border-radius:10px;padding:12px 14px}
+.cd-t{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);font-weight:600;margin-bottom:1px}
+.cd-v{font-size:22px;font-weight:700;letter-spacing:-.5px;font-family:'IBM Plex Mono',monospace;line-height:1.2}
+.cd-s{font-size:11px;color:var(--t2);margin-top:1px}
+@media(min-width:768px){.cd{padding:16px 20px}.cd-v{font-size:26px}}
+.pos{color:var(--grn)}.neg{color:var(--red)}.wrn{color:var(--amb)}
+.regime{border-radius:12px;padding:20px 16px;text-align:center;margin:8px 0 12px;border:2px solid}
+.regime.r-s{background:var(--grn-bg);border-color:var(--grn)}.regime.r-w{background:var(--amb-bg);border-color:var(--amb)}.regime.r-d{background:var(--red-bg);border-color:var(--red)}
+.regime-score{font-family:'IBM Plex Mono',monospace;font-size:48px;font-weight:700;line-height:1}
+.regime-label{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.regime-action{font-size:13px;color:var(--t2);margin-top:8px;line-height:1.5}
+@media(min-width:768px){.regime{padding:28px 20px}.regime-score{font-size:64px}.regime-label{font-size:16px}}
+.sig-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--b);font-size:13px;min-height:44px}.sig-row:last-child{border:none}
+.sig-name{font-weight:600;flex:1}.sig-val{text-align:right;display:flex;align-items:center;gap:6px}
+.sec{font-family:'Source Serif 4',serif;font-size:16px;font-weight:600;margin:20px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--b)}
+@media(min-width:768px){.sec{font-size:19px;margin:26px 0 12px}}
+.ch{background:var(--cd);border:1px solid var(--b);border-radius:10px;padding:8px;margin:8px 0;overflow:hidden}
+.ch-t{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);font-weight:600;padding:0 4px 4px}
+@media(min-width:768px){.ch{padding:14px;margin:14px 0}.ch-t{font-size:11px}}
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0;border:1px solid var(--b);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
+thead th{text-align:left;padding:8px 7px;background:var(--sf);border-bottom:2px solid var(--b);font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:var(--t2);position:sticky;top:0;z-index:5}
+tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
+@media(min-width:768px){table{font-size:13px}thead th{padding:10px 12px;font-size:10px}tbody td{padding:8px 12px}}
+.bg{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;line-height:1.3}
+.bg-r{background:var(--red-bg);color:var(--red)}.bg-g{background:var(--grn-bg);color:var(--grn)}.bg-w{background:var(--amb-bg);color:var(--amb)}.bg-b{background:var(--blu-bg);color:var(--blu)}
+.box{background:var(--sf);border:1px solid var(--b);border-radius:10px;padding:12px;margin:8px 0;font-size:12px;color:var(--t2);line-height:1.6}.box strong{color:var(--t1)}
+.sbox{border:1px solid var(--grn);border-radius:10px;padding:12px 14px;background:var(--grn-bg);margin:8px 0}
+.sbox h3{color:var(--grn);font-size:13px;margin-bottom:3px;font-weight:700}.sbox p{color:var(--t2);font-size:12px;line-height:1.5}
+.qc{border:2px solid var(--amb);border-radius:10px;padding:14px;background:var(--amb-bg);margin:12px 0}
+.qc h3{color:var(--amb);font-size:14px;margin-bottom:8px;font-family:'Source Serif 4',serif;font-weight:700}
+.qi{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(180,83,9,.08);font-size:12px;gap:6px}.qi:last-child{border:none}
+.qi span:first-child{flex:1;min-width:0}.qi span:last-child{text-align:right;flex-shrink:0}
+.sa{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+@media(min-width:600px){.sa{grid-template-columns:repeat(4,1fr)}}
+.sa-c{background:var(--cd);border:1px solid var(--b);border-radius:10px;padding:10px;text-align:center}
+.sa-l{font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--t3);font-weight:600}
+.sa-v{font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin:2px 0;line-height:1.2}
+.sa-s{font-size:10px;color:var(--t2)}
+@media(min-width:768px){.sa-l{font-size:10px}.sa-v{font-size:24px}}
+.cmp th{background:var(--blu-bg);color:var(--blu)}
+::-webkit-scrollbar{width:5px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
 </style>
 </head>
 <body>
-
-<div id="loading">
-  <h2>Equity Defense Dashboard</h2>
-  <div id="load-bar-wrap"><div id="load-bar"></div></div>
-  <div id="load-status">Initializing…</div>
-  <div id="load-log"></div>
-  <div id="cache-controls"><span id="cache-status"></span></div>
-</div>
-
-<div class="masthead">
-  <div class="masthead-inner">
-    <div>
-      <h1>Equity Defense — <em>Signal Monitor</em></h1>
-      <div class="masthead-sub">Enhanced Blowup · Faber 10M · Dual Momentum · Composite · Buy &amp; Hold</div>
-    </div>
-    <div class="masthead-meta">
-      <div class="mono" id="meta-period">—</div>
-      <div class="mono" id="meta-signals">—</div>
-      <div id="meta-cache" style="font-size:10px;color:var(--t3);margin-top:3px">—</div>
-    </div>
-  </div>
-</div>
-
-<div class="tabs-bar">
-  <div class="tabs-inner">
-    <button class="tab-btn active" data-tab="tab-monitor">Monitor</button>
-    <button class="tab-btn" data-tab="tab-overview">Overview</button>
-    <button class="tab-btn" data-tab="tab-comparison">Compare</button>
-    <button class="tab-btn" data-tab="tab-signal">Signals</button>
-    <button class="tab-btn" data-tab="tab-strategies">Strategies</button>
-    <button class="tab-btn" data-tab="tab-events">Events</button>
-    <button class="tab-btn" data-tab="tab-risk">Risk</button>
-    <button class="tab-btn" data-tab="tab-qc">QC</button>
-  </div>
-</div>
-
-<!-- MONITOR -->
-<div class="tab-panel active" id="tab-monitor">
-  <div class="section-title">Current Signal Status</div>
-  <div class="grid g3" id="monitor-cards"></div>
-  <div class="note-box" id="monitor-summary"></div>
-  <div class="grid g2">
-    <div>
-      <div class="section-title" style="font-size:15px">Breakdown</div>
-      <div id="monitor-details" class="card" style="font-size:12px"></div>
-    </div>
-    <div>
-      <div class="section-title" style="font-size:15px">Definitions</div>
-      <div class="card" style="font-size:12px;line-height:1.5">
-        <div class="qc-item"><span><strong>Blowup</strong></span><span>8d stocks down ≥7%. ≥115=stress</span></div>
-        <div class="qc-item"><span><strong>200d MA</strong></span><span>Below = bear regime (Faber)</span></div>
-        <div class="qc-item"><span><strong>Canary</strong></span><span>VWO/BND neg mom (Keller 2018)</span></div>
-        <div class="qc-item"><span><strong>12M Mom</strong></span><span>Absolute momentum (Antonacci)</span></div>
-        <div class="qc-item"><span><strong>10M SMA</strong></span><span>Faber monthly timing</span></div>
-        <div class="qc-item"><span><strong>Composite</strong></span><span>≥2/5 = full defensive</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="chart-wrap"><div class="chart-label">Composite Score History</div><div id="chart-composite-ts" style="height:200px"></div></div>
-</div>
-
-<!-- OVERVIEW -->
-<div class="tab-panel" id="tab-overview">
-  <div class="grid g4" id="overview-metrics"></div>
-  <div class="chart-wrap"><div class="chart-label">S&P 500 (Total Return) + Blowup Signals</div><div id="chart-equity" style="height:300px"></div></div>
-  <div class="grid g2">
-    <div class="chart-wrap"><div class="chart-label">Drawdown — All Strategies</div><div id="chart-dd" style="height:240px"></div></div>
-    <div class="chart-wrap"><div class="chart-label">Rolling 8-Day Blowup Count</div><div id="chart-blowup" style="height:240px"></div></div>
-  </div>
-  <div class="chart-wrap"><div class="chart-label">Equity Curves (Log Scale)</div><div id="chart-strat" style="height:320px"></div></div>
-</div>
-
-<!-- COMPARISON -->
-<div class="tab-panel" id="tab-comparison">
-  <div class="section-title">Head-to-Head</div>
-  <div class="table-scroll" id="compare-table-wrap"></div>
-  <div class="chart-wrap"><div class="chart-label">Annual Returns</div><div id="chart-annual" style="height:300px"></div></div>
-  <div class="grid g2">
-    <div class="chart-wrap"><div class="chart-label">DD: Composite vs B&H</div><div id="chart-dd-compare" style="height:240px"></div></div>
-    <div class="chart-wrap"><div class="chart-label">Defensive Allocation (Composite)</div><div id="chart-alloc" style="height:240px"></div></div>
-  </div>
-</div>
-
-<!-- SIGNAL ANALYSIS -->
-<div class="tab-panel" id="tab-signal">
-  <div class="section-title">Forward Returns After Blowup Signals</div>
-  <div class="note-box">What happens after a blowup signal fires? <span id="sig-n">—</span> historical events analyzed across 1M, 3M, 6M, and 12M horizons.</div>
-  <div id="signal-fwd-metrics" class="sig-summary"></div>
-  <div class="section-title" style="font-size:15px">Event-Level Forward Returns</div>
-  <div class="table-scroll" id="signal-fwd-table-wrap"></div>
-  <div class="chart-wrap"><div class="chart-label">Forward Return Paths (12M)</div><div id="chart-fwd-paths" style="height:300px"></div></div>
-  <div class="note-box" id="signal-interpretation"></div>
-  <div class="grid g2">
-    <div class="chart-wrap"><div class="chart-label">Forward Max DD Distribution</div><div id="chart-fwd-dd" style="height:240px"></div></div>
-    <div class="chart-wrap"><div class="chart-label">Distance from ATH at Signal</div><div id="chart-ath-dist" style="height:240px"></div></div>
-  </div>
-  <div class="section-title" style="font-size:15px">Statistics</div>
-  <div class="card" id="signal-stats-card" style="font-size:12px"></div>
-</div>
-
-<!-- STRATEGIES -->
-<div class="tab-panel" id="tab-strategies">
-  <div class="section-title">5 Defensive Strategies</div>
-  <div class="improve-box"><h3>S1: Enhanced Blowup</h3><p><strong>Trigger:</strong> Blowup ≥115 OR (SPX &lt; 200d AND canary bad) → IEF. <strong>Re-entry:</strong> SPX &gt; 200d + canary clear + 63d cooldown.</p></div>
-  <div class="improve-box"><h3>S2: Faber 10-Month SMA</h3><p>Monthly — SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007). Backtested to 1886.</p></div>
-  <div class="improve-box"><h3>S3: Dual Momentum (Antonacci)</h3><p>Monthly — SPY 12M &gt; IEF 12M AND SPY 12M &gt; 0 → SPY, else → IEF. Dow Award winner.</p></div>
-  <div class="improve-box"><h3>S4: Composite (≥2/5)</h3><p>5 sub-signals scored 0/1. ≥2 → 100% IEF, =1 → 50% IEF. Multi-signal confirmation.</p></div>
-  <div class="improve-box"><h3>S5: Buy &amp; Hold</h3><p>100% SPY total return. Benchmark. Full drawdown exposure.</p></div>
-</div>
-
-<!-- EVENTS -->
-<div class="tab-panel" id="tab-events">
-  <div class="section-title">Signal Event Log</div>
-  <div class="table-scroll" style="max-height:70vh;overflow-y:auto">
-    <table id="events-table"><thead><tr>
-      <th>#</th><th>Date</th><th>8D</th><th>SPX</th><th>ATH</th><th>Can</th><th>MA</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th>
-    </tr></thead><tbody id="events-tbody"></tbody></table>
-  </div>
-</div>
-
-<!-- RISK -->
-<div class="tab-panel" id="tab-risk">
-  <div class="section-title">Risk-Adjusted Performance</div>
-  <div class="grid g4" id="risk-metrics"></div>
-  <div class="grid g2">
-    <div class="chart-wrap"><div class="chart-label">Monthly Returns — Composite</div><div id="chart-monthly-dist" style="height:240px"></div></div>
-    <div class="chart-wrap"><div class="chart-label">Rolling 12M Sharpe</div><div id="chart-rolling-sharpe" style="height:240px"></div></div>
-  </div>
-</div>
-
-<!-- QC -->
-<div class="tab-panel" id="tab-qc">
-  <div class="section-title">Quality Control</div>
-  <div class="qc-box"><h3>Validation Report</h3><div id="qc-items"></div></div>
-  <div class="section-title" style="font-size:15px">Data</div><div class="card" id="qc-data"></div>
-  <div class="section-title" style="font-size:15px">Backtest</div><div class="card" id="qc-backtest"></div>
-  <div class="section-title" style="font-size:15px">Statistics</div><div class="card" id="qc-stats"></div>
-</div>
+<div id="loading"><h2>S&P 500 Risk Overlay</h2><div id="load-bar-wrap"><div id="load-bar"></div></div><div id="load-status">Initializing…</div><div id="load-log"></div><div id="cache-controls"><span id="cache-status"></span></div></div>
+<div class="hd"><div class="hd-inner"><div><h1>S&P 500 Risk Overlay <span>/ Regime Monitor</span></h1></div><div class="hd-right"><div class="mono" id="hd-period">—</div><div id="hd-updated">—</div></div></div></div>
+<div class="tabs"><div class="tabs-inner">
+<button class="tab on" data-t="t-mon">Monitor</button><button class="tab" data-t="t-ov">Overview</button><button class="tab" data-t="t-cmp">Compare</button><button class="tab" data-t="t-sig">Signals</button><button class="tab" data-t="t-str">Strategies</button><button class="tab" data-t="t-ev">Events</button><button class="tab" data-t="t-rsk">Risk</button><button class="tab" data-t="t-qc">QC</button>
+</div></div>
+<div class="pnl on" id="t-mon"><div id="regime-hero"></div><div class="g g3" id="mon-cards"></div><div class="sec" style="font-size:14px">5 Risk Signals</div><div class="cd" id="mon-sig"></div><div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div></div>
+<div class="pnl" id="t-ov"><div class="g g4" id="ov-cards"></div><div class="ch"><div class="ch-t">S&P 500 Total Return + Stress Events</div><div id="ch-eq" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">Drawdown — All Strategies</div><div id="ch-dd" style="height:220px"></div></div><div class="ch"><div class="ch-t">8-Day Stress Count</div><div id="ch-bu" style="height:220px"></div></div></div><div class="ch"><div class="ch-t">Equity Curves (Log)</div><div id="ch-st" style="height:300px"></div></div></div>
+<div class="pnl" id="t-cmp"><div class="sec">Strategy Comparison</div><div class="tbl" id="cmp-tbl"></div><div class="ch"><div class="ch-t">Annual Returns</div><div id="ch-ann" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">DD: Composite vs B&H</div><div id="ch-ddc" style="height:220px"></div></div><div class="ch"><div class="ch-t">Defensive Allocation %</div><div id="ch-alloc" style="height:220px"></div></div></div></div>
+<div class="pnl" id="t-sig"><div class="sec">Forward Returns After Stress Events</div><div class="box">What happens after a stress signal fires? <strong id="sig-n">—</strong> historical events analyzed across 1–12 month horizons.</div><div id="sig-cards" class="sa"></div><div class="sec" style="font-size:14px">Per-Event Returns</div><div class="tbl" id="sig-tbl"></div><div class="ch"><div class="ch-t">Forward Paths (12M)</div><div id="ch-fwd" style="height:260px"></div></div><div class="box" id="sig-interp"></div><div class="g g2"><div class="ch"><div class="ch-t">Max DD Distribution</div><div id="ch-fdd" style="height:220px"></div></div><div class="ch"><div class="ch-t">Distance from ATH at Signal</div><div id="ch-ath" style="height:220px"></div></div></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="sig-stats"></div></div>
+<div class="pnl" id="t-str"><div class="sec">5 Defensive Strategies</div><div class="sbox"><h3>S1: Enhanced Stress Signal</h3><p><strong>Entry:</strong> 8D count ≥115 OR (SPX &lt; 200d AND canary bad) → IEF. <strong>Exit:</strong> SPX &gt; 200d + canary clear + 63d cooldown.</p></div><div class="sbox"><h3>S2: Faber 10-Month SMA</h3><p>Monthly. SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007).</p></div><div class="sbox"><h3>S3: Dual Momentum (Antonacci)</h3><p>Monthly. SPY 12M &gt; IEF 12M AND &gt; 0 → SPY, else → IEF.</p></div><div class="sbox"><h3>S4: Composite (≥2 of 5)</h3><p>Score 5 sub-signals. ≥2 → 100% IEF. =1 → 50/50.</p></div><div class="sbox"><h3>S5: Buy &amp; Hold</h3><p>100% SPY. Benchmark.</p></div></div>
+<div class="pnl" id="t-ev"><div class="sec">Stress Event Log</div><div class="tbl" style="max-height:75vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Date</th><th>8D</th><th>SPX</th><th>ATH</th><th>Can</th><th>MA</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody id="ev-body"></tbody></table></div></div>
+<div class="pnl" id="t-rsk"><div class="sec">Risk-Adjusted Metrics</div><div class="g g4" id="rsk-cards"></div><div class="g g2"><div class="ch"><div class="ch-t">Monthly Returns — Composite</div><div id="ch-mdist" style="height:220px"></div></div><div class="ch"><div class="ch-t">Rolling 12M Sharpe</div><div id="ch-rshp" style="height:220px"></div></div></div></div>
+<div class="pnl" id="t-qc"><div class="sec">Quality Control</div><div class="qc"><h3>Validation</h3><div id="qc-chk"></div></div><div class="sec" style="font-size:14px">Data</div><div class="cd" id="qc-data"></div><div class="sec" style="font-size:14px">Backtest</div><div class="cd" id="qc-bt"></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="qc-st"></div></div>
 
 <script>
 /* __INJECT_DATA__ */
-
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 function setBar(p){$('#load-bar').style.width=p+'%'}
 function setStatus(s){$('#load-status').textContent=s}
 function log(s){const d=$('#load-log');d.innerHTML+=s+'<br>';d.scrollTop=d.scrollHeight}
 function pct(v,d=1){return v==null?'—':(v>=0?'+':'')+((v*100).toFixed(d))+'%'}
 function fmt(v,d=0){return v==null?'—':v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d})}
-const mob=window.innerWidth<768;
+const M=window.innerWidth<768;
+const PL=(t='')=>({paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{family:'Source Sans 3',size:M?9:12,color:'#555b6e'},title:t?{text:t,font:{size:M?10:14,color:'#1a1a2e'},x:0,xanchor:'left',y:.98}:undefined,margin:{t:t?28:8,r:M?4:16,b:M?28:36,l:M?34:56},xaxis:{gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?8:11}},yaxis:{gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?8:11}},legend:{bgcolor:'transparent',font:{size:M?8:11},orientation:'h',y:-.22,x:.5,xanchor:'center'},hovermode:M?'closest':'x unified',dragmode:false});
+const PC=M?{responsive:true,displayModeBar:false,scrollZoom:false,staticPlot:true}:{responsive:true,displayModeBar:false,scrollZoom:false};
+const lw=M?1:1.5;
 
-const L=(title='')=>({
-  paper_bgcolor:'transparent',plot_bgcolor:'transparent',
-  font:{family:'Source Sans 3',size:mob?10:12,color:'#555b6e'},
-  title:title?{text:title,font:{size:mob?11:14,color:'#1a1a2e'}}:undefined,
-  margin:{t:title?32:12,r:mob?6:20,b:mob?30:40,l:mob?38:60},
-  xaxis:{gridcolor:'#e2e5e9',linecolor:'#e2e5e9',zerolinecolor:'#e2e5e9'},
-  yaxis:{gridcolor:'#e2e5e9',linecolor:'#e2e5e9',zerolinecolor:'#e2e5e9'},
-  legend:{bgcolor:'transparent',font:{size:mob?8:11},orientation:mob?'h':'v',y:mob?-0.3:1,x:mob?0.5:1,xanchor:mob?'center':'right'},
-  hovermode:'x unified'
-});
-const PC={responsive:true,displayModeBar:false,scrollZoom:false};
-const SAMPLE_SIZE=90;
+function render(D){
+const{rolling:R,signals:SIG,bt:BT,m:MET,qc:QC,allData:AD}=D;
+const last=R[R.length-1];
+const STR=[{k:'enh',n:'Enhanced',c:'#dc2626'},{k:'fab',n:'Faber',c:'#7c3aed',d:'dot'},{k:'dm',n:'DualMom',c:'#b45309',d:'dashdot'},{k:'comp',n:'Composite',c:'#15803d'},{k:'bh',n:'B&H',c:'#8e95a5'}];
+$('#hd-period').textContent=R[0].date+' → '+last.date;
+$('#hd-updated').textContent=SIG.length+' stress events · Score '+last.compositeScore+'/5';
 
-function render(data){
-  const{rolling,signals,bt,m,qc,allData}=data;
-  const last=rolling[rolling.length-1];
-  const S=[
-    {key:'enh',name:'Enh Blowup',color:'#dc2626'},
-    {key:'fab',name:'Faber 10M',color:'#7c3aed',dash:'dot'},
-    {key:'dm',name:'Dual Mom',color:'#b45309',dash:'dashdot'},
-    {key:'comp',name:'Composite',color:'#15803d'},
-    {key:'bh',name:'Buy & Hold',color:'#8e95a5'}
-  ];
+// MONITOR
+var ba=last.rolling8d>=115,b2=last.sma200!=null&&last.spx<last.sma200,cb=last.canaryBad>=1,sn=last.spy12mNeg,b10=last.belowSMA10m;
+var cs=last.compositeScore,rc=cs>=3?'r-d':cs>=1?'r-w':'r-s';
+var rl=cs>=3?'HIGH RISK':cs>=2?'ELEVATED':cs===1?'CAUTION':'ALL CLEAR';
+var ra=cs>=2?'Full Defensive — 100% IEF':cs===1?'Partial — 50% IEF / 50% SPY':'Fully Invested — 100% SPY';
+var sc=cs>=3?'var(--red)':cs>=1?'var(--amb)':'var(--grn)';
+$('#regime-hero').innerHTML='<div class="regime '+rc+'"><div class="regime-score" style="color:'+sc+'">'+cs+'<span style="font-size:24px;font-weight:400;color:var(--t3)">/5</span></div><div class="regime-label" style="color:'+sc+'">'+rl+'</div><div class="regime-action"><strong>'+last.date+'</strong> — '+ra+'</div></div>';
+$('#mon-cards').innerHTML=[{t:'S&P 500',v:fmt(last.spx,0),s:(last.aboveSMA200?'Above':'Below')+' 200d MA'},{t:'8-Day Stress',v:last.rolling8d,c:ba?'neg':'pos',s:'Threshold: 115'},{t:'12M Return',v:pct(last.spy12mRet),c:last.spy12mRet>=0?'pos':'neg',s:'SPY total return'}].map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v '+(c.c||'')+'">'+c.v+'</div><div class="cd-s">'+c.s+'</div></div>'}).join('');
+var si=function(v){return v?'<span class="bg bg-r">RISK</span>':'<span class="bg bg-g">OK</span>'};
+$('#mon-sig').innerHTML=[{n:'Stress Count ≥ 115',v:si(ba),d:last.rolling8d},{n:'SPX below 200d MA',v:si(b2),d:fmt(last.spx,0)+' vs '+(last.sma200?fmt(last.sma200,0):'—')},{n:'Canary (VWO/BND)',v:si(cb),d:last.canaryBad+'/'+last.canaryTotal},{n:'SPY 12M Return < 0',v:si(sn),d:last.spy12mRet!=null?pct(last.spy12mRet):'—'},{n:'SPX below 10M SMA',v:si(b10),d:last.sma10m?fmt(last.sma10m,0):'—'}].map(function(s){return '<div class="sig-row"><span class="sig-name">'+s.n+'</span><span class="sig-val">'+s.v+' <span class="mono" style="color:var(--t3);font-size:11px">'+s.d+'</span></span></div>'}).join('');
+Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,5.3]})}),PC);
 
-  $('#meta-period').textContent=`${rolling[0].date} → ${last.date}`;
-  $('#meta-signals').textContent=`${signals.length} signals · Score: ${last.compositeScore}/5`;
+// OVERVIEW
+$('#ov-cards').innerHTML=[{t:'B&H CAGR',v:pct(MET.bh.cagr),c:'pos'},{t:'Comp CAGR',v:pct(MET.comp.cagr),c:MET.comp.cagr>0?'pos':'neg'},{t:'B&H Max DD',v:pct(MET.bh.maxDD),c:'neg'},{t:'Comp Max DD',v:pct(MET.comp.maxDD),c:'neg'}].map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v '+c.c+'">'+c.v+'</div></div>'}).join('');
+Plotly.newPlot('ch-eq',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw}},{x:SIG.map(function(s){return s.date}),y:SIG.map(function(s){return s.spx}),type:'scatter',mode:'markers',name:'Stress',marker:{color:'#dc2626',size:M?5:8,line:{color:'#fff',width:M?.5:1}}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{type:'log'})}),PC);
+Plotly.newPlot('ch-dd',STR.map(function(s){return{x:BT[s.k].map(function(e){return e.date}),y:BT[s.k].map(function(e){return e.dd*100}),type:'scatter',name:s.n,line:{color:s.c,width:s.k==='comp'?lw+.5:lw*.8,dash:s.d},fill:s.k==='comp'?'tozeroy':undefined,fillcolor:s.k==='comp'?'rgba(22,163,74,.05)':undefined}}),PL(),PC);
+Plotly.newPlot('ch-bu',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.rolling8d}),type:'scatter',mode:'lines',name:'Count',line:{color:'#b45309',width:lw}},{x:[R[0].date,last.date],y:[115,115],type:'scatter',mode:'lines',name:'115',line:{color:'#dc2626',width:1.5,dash:'dash'}}],PL(),PC);
+Plotly.newPlot('ch-st',STR.map(function(s){return{x:BT[s.k].map(function(e){return e.date}),y:BT[s.k].map(function(e){return e.equity}),type:'scatter',mode:'lines',name:s.n,line:{color:s.c,width:s.k==='comp'?lw+1:lw,dash:s.d}}}),Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{type:'log'})}),PC);
 
-  // ── MONITOR ──
-  const ba=last.rolling8d>=115,b2=last.sma200!=null&&last.spx<last.sma200;
-  const cb=last.canaryBad>=1,sn=last.spy12mNeg,b10=last.belowSMA10m;
-  const cs=last.compositeScore;
-  const cc=cs>=3?'negative':cs>=1?'neutral':'positive';
-  const cl=cs>=3?'HIGH RISK':cs>=2?'ELEVATED':cs===1?'CAUTION':'ALL CLEAR';
+// COMPARE
+var sk=['bh','enh','fab','dm','comp'],sn2=['B&H','Enh','Faber','DM','Comp'];
+var ml=['cagr','totalRet','maxDD','vol','sharpe','sortino','calmar','winRate','defFrac'],mn=['CAGR','Total','MaxDD','Vol','Sharpe','Sortino','Calmar','Win%','Def%'];
+$('#cmp-tbl').innerHTML='<table class="cmp"><thead><tr><th></th>'+sn2.map(function(n){return '<th>'+n+'</th>'}).join('')+'</tr></thead><tbody>'+mn.map(function(l,i){return '<tr><td><strong>'+l+'</strong></td>'+sk.map(function(k){var x=MET[k][ml[i]];return '<td class="mono">'+(i<=3||i>=7?pct(x):x.toFixed(2))+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table>';
+Plotly.newPlot('ch-ann',STR.map(function(s){return{x:MET[s.k].annual.map(function(a){return a.year}),y:MET[s.k].annual.map(function(a){return a.ret*100}),type:'bar',name:s.n,marker:{color:s.c,opacity:.6}}}),Object.assign({},PL(),{barmode:'group'}),PC);
+Plotly.newPlot('ch-ddc',[{x:BT.bh.map(function(e){return e.date}),y:BT.bh.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'B&H',line:{color:'#8e95a5',width:lw},fillcolor:'rgba(142,149,165,.05)'},{x:BT.comp.map(function(e){return e.date}),y:BT.comp.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'Comp',line:{color:'#15803d',width:lw},fillcolor:'rgba(22,163,74,.05)'}],PL(),PC);
+Plotly.newPlot('ch-alloc',[{x:BT.comp.map(function(e){return e.date}),y:BT.comp.map(function(e){return e.mode==='defensive'?100:e.mode==='partial'?50:0}),type:'scatter',fill:'tozeroy',name:'Def%',line:{color:'#b45309',width:0},fillcolor:'rgba(180,83,9,.15)'}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,110]})}),PC);
 
-  $('#monitor-cards').innerHTML=[
-    {t:'Composite',v:`${cs}/5`,c:cc,s:cl},
-    {t:'SPX',v:fmt(last.spx,0),c:'',s:`${last.aboveSMA200?'Above':'Below'} 200d`},
-    {t:'Blowup 8D',v:last.rolling8d,c:ba?'negative':'positive',s:'Threshold: 115'}
-  ].map(c=>`<div class="card"><div class="card-title">${c.t}</div><div class="card-value ${c.c}">${c.v}</div><div class="card-sub">${c.s}</div></div>`).join('');
+// SIGNALS
+var vs=SIG.filter(function(s){return s.fwd&&s.fwd.maxDD12M!=null});
+$('#sig-n').textContent=vs.length;
+if(vs.length>0){
+var avg=function(k){var f=vs.filter(function(s){return s.fwd[k]!=null});return f.length?f.reduce(function(a,s){return a+s.fwd[k]},0)/f.length:null};
+var med=function(k){var f=vs.filter(function(s){return s.fwd[k]!=null}).map(function(s){return s.fwd[k]}).sort(function(a,b){return a-b});return f.length?f[Math.floor(f.length/2)]:null};
+var wr=function(k){var f=vs.filter(function(s){return s.fwd[k]!=null});return f.length?f.filter(function(s){return s.fwd[k]>0}).length/f.length:null};
+var aDD=vs.reduce(function(a,s){return a+s.fwd.maxDD12M},0)/vs.length;
+$('#sig-cards').innerHTML=[{l:'Avg 12M',v:pct(avg('fwd12M')),c:avg('fwd12M')>0?'pos':'neg',s:'Med: '+pct(med('fwd12M'))},{l:'12M Win Rate',v:pct(wr('fwd12M')),c:wr('fwd12M')>.5?'pos':'neg',s:vs.filter(function(s){return s.fwd.fwd12M!=null&&s.fwd.fwd12M>0}).length+'/'+vs.filter(function(s){return s.fwd.fwd12M!=null}).length},{l:'Avg Max DD',v:pct(aDD),c:'neg',s:'12M post-signal'},{l:'Avg 1M Fwd',v:pct(avg('fwd1M')),c:avg('fwd1M')>0?'pos':'neg',s:'Win: '+pct(wr('fwd1M'))}].map(function(c){return '<div class="sa-c"><div class="sa-l">'+c.l+'</div><div class="sa-v '+c.c+'">'+c.v+'</div><div class="sa-s">'+c.s+'</div></div>'}).join('');
+var tr=vs.map(function(s){var c=function(v){return v==null?'':v>0?'pos':'neg'};return '<tr><td class="mono">'+s.date+'</td><td><span class="bg bg-r">'+s.rolling8d+'</span></td><td class="'+c(s.fwd.fwd1M)+'">'+pct(s.fwd.fwd1M)+'</td><td class="'+c(s.fwd.fwd3M)+'">'+pct(s.fwd.fwd3M)+'</td><td class="'+c(s.fwd.fwd6M)+'">'+pct(s.fwd.fwd6M)+'</td><td class="'+c(s.fwd.fwd12M)+'">'+pct(s.fwd.fwd12M)+'</td><td class="neg">'+pct(s.fwd.maxDD12M)+'</td></tr>'}).join('');
+tr+='<tr style="font-weight:700;border-top:2px solid var(--b)"><td>AVG</td><td></td><td class="'+(avg('fwd1M')>0?'pos':'neg')+'">'+pct(avg('fwd1M'))+'</td><td class="'+(avg('fwd3M')>0?'pos':'neg')+'">'+pct(avg('fwd3M'))+'</td><td class="'+(avg('fwd6M')>0?'pos':'neg')+'">'+pct(avg('fwd6M'))+'</td><td class="'+(avg('fwd12M')>0?'pos':'neg')+'">'+pct(avg('fwd12M'))+'</td><td class="neg">'+pct(aDD)+'</td></tr>';
+tr+='<tr style="font-weight:700"><td>MED</td><td></td><td>'+pct(med('fwd1M'))+'</td><td>'+pct(med('fwd3M'))+'</td><td>'+pct(med('fwd6M'))+'</td><td>'+pct(med('fwd12M'))+'</td><td></td></tr>';
+$('#sig-tbl').innerHTML='<table><thead><tr><th>Date</th><th>8D</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody>'+tr+'</tbody></table>';
+var p12=vs.filter(function(s){return s.fwd.fwd12M!=null&&s.fwd.fwd12M>0}).length,t12=vs.filter(function(s){return s.fwd.fwd12M!=null}).length;
+$('#sig-interp').innerHTML='<strong>Summary:</strong> '+p12+'/'+t12+' events ('+(p12/t12*100).toFixed(0)+'%) saw positive 12M returns. Average: '+pct(avg('fwd12M'))+'. Max drawdown: '+pct(aDD)+'. '+(avg('fwd3M')<0?'Short-term pain persists ~3M.':'Recovery begins early.')+' Mean-median spread: '+(Math.abs(avg('fwd12M')-med('fwd12M'))>.05?'wide — outlier-driven.':'tight — consistent.');
+Plotly.newPlot('ch-fwd',vs.map(function(s){return{x:Array.from({length:s.fwd.path.length},function(_,j){return j}),y:s.fwd.path.map(function(v){return v*100}),type:'scatter',mode:'lines',name:s.date,line:{width:M?.7:1.2},opacity:.6}}),Object.assign({},PL(),{showlegend:!M}),PC);
+Plotly.newPlot('ch-fdd',[{x:vs.map(function(s){return s.fwd.maxDD12M*100}),type:'histogram',nbinsx:10,marker:{color:'rgba(220,38,38,.5)',line:{color:'#dc2626',width:1}}}],PL(),PC);
+Plotly.newPlot('ch-ath',[{x:SIG.map(function(s){return s.date}),y:SIG.map(function(s){return s.athDist*100}),type:'bar',marker:{color:SIG.map(function(s){return s.athDist>-.05?'#dc2626':'#2563eb'})}}],PL(),PC);
+var dv=vs.map(function(s){return s.fwd.maxDD12M}),dm=dv.reduce(function(a,b){return a+b},0)/dv.length,ds=Math.sqrt(dv.reduce(function(a,v){return a+(v-dm)*(v-dm)},0)/(dv.length-1)),de=ds/Math.sqrt(dv.length);
+$('#sig-stats').innerHTML=[['N',vs.length],['Mean DD',(dm*100).toFixed(1)+'%'],['SE','±'+(de*100).toFixed(1)+'%'],['95% CI','['+((dm-1.96*de)*100).toFixed(1)+'%, '+((dm+1.96*de)*100).toFixed(1)+'%]'],['12M Win',pct(wr('fwd12M'))],['Median 12M',pct(med('fwd12M'))]].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('');
+}
 
-  const si=v=>v?'<span class="badge badge-danger">RISK</span>':'<span class="badge badge-safe">OK</span>';
-  $('#monitor-details').innerHTML=
-    `<div class="qc-item"><span>1. Blowup ≥115</span><span>${si(ba)} ${last.rolling8d}</span></div>`+
-    `<div class="qc-item"><span>2. SPX < 200d</span><span>${si(b2)} ${fmt(last.spx,0)} vs ${last.sma200?fmt(last.sma200,0):'—'}</span></div>`+
-    `<div class="qc-item"><span>3. Canary</span><span>${si(cb)} ${last.canaryBad}/${last.canaryTotal}</span></div>`+
-    `<div class="qc-item"><span>4. 12M < 0</span><span>${si(sn)} ${last.spy12mRet!=null?pct(last.spy12mRet):'—'}</span></div>`+
-    `<div class="qc-item"><span>5. < 10M SMA</span><span>${si(b10)}</span></div>`+
-    `<div class="qc-item" style="border-top:2px solid var(--border);padding-top:5px;margin-top:3px"><span><strong>TOTAL</strong></span><span><strong class="${cc}">${cs}/5 → ${cl}</strong></span></div>`;
+// EVENTS
+$('#ev-body').innerHTML=SIG.map(function(s,i){var c=function(v){return v==null?'':v>0?'pos':'neg'};return '<tr><td>'+(i+1)+'</td><td class="mono">'+s.date+'</td><td><span class="bg bg-r">'+s.rolling8d+'</span></td><td class="mono">'+fmt(s.spx,0)+'</td><td><span class="bg '+(s.athDist>-.05?'bg-r':'bg-b')+'">'+pct(s.athDist,0)+'</span></td><td>'+(s.canaryBad>0?'<span class="bg bg-w">!</span>':'<span class="bg bg-g">✓</span>')+'</td><td>'+(s.aboveSMA200?'<span class="bg bg-g">↑</span>':'<span class="bg bg-r">↓</span>')+'</td><td class="'+c(s.fwd.fwd1M)+'">'+pct(s.fwd.fwd1M)+'</td><td class="'+c(s.fwd.fwd3M)+'">'+pct(s.fwd.fwd3M)+'</td><td class="'+c(s.fwd.fwd6M)+'">'+pct(s.fwd.fwd6M)+'</td><td class="'+c(s.fwd.fwd12M)+'">'+pct(s.fwd.fwd12M)+'</td><td class="neg">'+pct(s.fwd.maxDD12M)+'</td></tr>'}).join('');
 
-  const bg=cs>=2?'background:var(--red-bg);border-color:var(--red)':cs>=1?'background:var(--amber-bg);border-color:var(--amber)':'background:var(--green-bg);border-color:var(--green)';
-  const ms=$('#monitor-summary');ms.style.cssText=`border:1px solid;border-radius:8px;padding:12px;${bg}`;
-  const at=cs>=2?'<strong>fully defensive</strong> (100% IEF)':cs===1?'<strong>partial</strong> (50% IEF)':'<strong>fully invested</strong> (100% SPY)';
-  ms.innerHTML=`<strong>${last.date}:</strong> Composite → ${at}. ${cs>=2?'Multiple indicators confirm risk.':cs===1?'One indicator flagging.':'All 5 indicators clear.'}`;
+// RISK
+$('#rsk-cards').innerHTML=STR.map(function(s){return{t:s.n+' Sharpe',v:MET[s.k].sharpe.toFixed(2)}}).concat([{t:'Comp Sortino',v:MET.comp.sortino.toFixed(2)},{t:'Comp Calmar',v:MET.comp.calmar.toFixed(2)},{t:'Comp Vol',v:pct(MET.comp.vol)}]).slice(0,8).map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v">'+c.v+'</div></div>'}).join('');
+Plotly.newPlot('ch-mdist',[{x:MET.comp.monthly.map(function(r){return r.ret*100}),type:'histogram',nbinsx:30,marker:{color:'rgba(22,163,74,.35)',line:{color:'#15803d',width:1}}}],PL(),PC);
+var rr=['comp','bh','enh'].map(function(k){var s=STR.find(function(x){return x.k===k});var rs=[];for(var i=252;i<BT[k].length;i++){var w=[];for(var j=i-251;j<=i;j++)w.push(BT[k][j].equity/BT[k][j-1].equity-1);var wm=w.reduce(function(a,b){return a+b},0)/w.length;var wv=Math.sqrt(w.reduce(function(a,r){return a+(r-wm)*(r-wm)},0)/(w.length-1))*Math.sqrt(252);rs.push({d:BT[k][i].date,sh:wv>0?((BT[k][i].equity/BT[k][i-252].equity-1)-.02)/wv:0})}return{x:rs.map(function(r){return r.d}),y:rs.map(function(r){return r.sh}),type:'scatter',mode:'lines',name:s.n,line:{color:s.c,width:lw,dash:s.d}}});
+Plotly.newPlot('ch-rshp',rr,PL(),PC);
 
-  Plotly.newPlot('chart-composite-ts',[
-    {x:rolling.map(r=>r.date),y:rolling.map(r=>r.compositeScore),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.1)',name:'Score'},
-    {x:[rolling[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2=Def',line:{color:'#b45309',dash:'dash',width:1}}
-  ],{...L(),yaxis:{...L().yaxis,title:'Score',range:[0,5.5]}},PC);
-
-  // ── OVERVIEW ──
-  $('#overview-metrics').innerHTML=[
-    {t:'B&H CAGR',v:pct(m.bh.cagr),c:'positive'},
-    {t:'Comp CAGR',v:pct(m.comp.cagr),c:m.comp.cagr>0?'positive':'negative'},
-    {t:'B&H Max DD',v:pct(m.bh.maxDD),c:'negative'},
-    {t:'Comp Max DD',v:pct(m.comp.maxDD),c:'negative'}
-  ].map(c=>`<div class="card"><div class="card-title">${c.t}</div><div class="card-value ${c.c}">${c.v}</div></div>`).join('');
-
-  Plotly.newPlot('chart-equity',[
-    {x:rolling.map(r=>r.date),y:rolling.map(r=>r.spx),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:1.5}},
-    {x:signals.map(s=>s.date),y:signals.map(s=>s.spx),type:'scatter',mode:'markers',name:'Blowup',marker:{color:'#dc2626',size:mob?6:9,line:{color:'#fff',width:1}}}
-  ],{...L(),yaxis:{...L().yaxis,type:'log',title:'SPY (log)'}},PC);
-
-  Plotly.newPlot('chart-dd',S.map(s=>({x:bt[s.key].map(e=>e.date),y:bt[s.key].map(e=>e.dd*100),type:'scatter',name:s.name,line:{color:s.color,width:s.key==='comp'?1.5:1,dash:s.dash},fill:s.key==='comp'?'tozeroy':undefined,fillcolor:s.key==='comp'?'rgba(22,163,74,.06)':undefined})),{...L(),yaxis:{...L().yaxis,title:'DD %'}},PC);
-
-  Plotly.newPlot('chart-blowup',[
-    {x:rolling.map(r=>r.date),y:rolling.map(r=>r.rolling8d),type:'scatter',mode:'lines',name:'Count',line:{color:'#b45309',width:1}},
-    {x:[rolling[0].date,last.date],y:[115,115],type:'scatter',mode:'lines',name:'115',line:{color:'#dc2626',width:2,dash:'dash'}}
-  ],{...L(),yaxis:{...L().yaxis,title:'Count'}},PC);
-
-  Plotly.newPlot('chart-strat',S.map(s=>({x:bt[s.key].map(e=>e.date),y:bt[s.key].map(e=>e.equity),type:'scatter',mode:'lines',name:s.name,line:{color:s.color,width:s.key==='comp'?2.5:1.5,dash:s.dash}})),{...L(),yaxis:{...L().yaxis,type:'log',title:'Equity ($)'}},PC);
-
-  // ── COMPARISON ──
-  const sk=['bh','enh','fab','dm','comp'],sn2=['B&H','Enh','Faber','DM','Comp'];
-  const ml=['cagr','totalRet','maxDD','vol','sharpe','sortino','calmar','winRate','defFrac'];
-  const mN=['CAGR','Total','MaxDD','Vol','Sharpe','Sortino','Calmar','Win%','Def%'];
-  const cr=mN.map((l,i)=>{
-    const v=sk.map(k=>{const x=m[k][ml[i]];return i<=3||i>=7?pct(x):x.toFixed(2)});
-    return `<tr><td><strong>${l}</strong></td>${v.map(x=>`<td class="mono">${x}</td>`).join('')}</tr>`;
-  });
-  $('#compare-table-wrap').innerHTML=`<table class="compare-table"><thead><tr><th></th>${sn2.map(n=>`<th>${n}</th>`).join('')}</tr></thead><tbody>${cr.join('')}</tbody></table>`;
-
-  Plotly.newPlot('chart-annual',S.map(s=>({x:m[s.key].annual.map(a=>a.year),y:m[s.key].annual.map(a=>a.ret*100),type:'bar',name:s.name,marker:{color:s.color,opacity:.6}})),{...L(),barmode:'group',yaxis:{...L().yaxis,title:'%'}},PC);
-
-  Plotly.newPlot('chart-dd-compare',[
-    {x:bt.bh.map(e=>e.date),y:bt.bh.map(e=>e.dd*100),type:'scatter',fill:'tozeroy',name:'B&H',line:{color:'#8e95a5',width:1},fillcolor:'rgba(142,149,165,.06)'},
-    {x:bt.comp.map(e=>e.date),y:bt.comp.map(e=>e.dd*100),type:'scatter',fill:'tozeroy',name:'Comp',line:{color:'#15803d',width:1.5},fillcolor:'rgba(22,163,74,.06)'}
-  ],{...L(),yaxis:{...L().yaxis,title:'DD %'}},PC);
-
-  Plotly.newPlot('chart-alloc',[{x:bt.comp.map(e=>e.date),y:bt.comp.map(e=>e.mode==='defensive'?100:e.mode==='partial'?50:0),type:'scatter',fill:'tozeroy',name:'Def%',line:{color:'#b45309',width:0},fillcolor:'rgba(180,83,9,.2)'}],{...L(),yaxis:{...L().yaxis,title:'%',range:[0,110]}},PC);
-
-  // ── SIGNAL ANALYSIS (ENHANCED) ──
-  const vs=signals.filter(s=>s.fwd&&s.fwd.maxDD12M!=null);
-  $('#sig-n').textContent=vs.length;
-  if(vs.length>0){
-    const avg=k=>{const f=vs.filter(s=>s.fwd[k]!=null);return f.length?f.reduce((a,s)=>a+s.fwd[k],0)/f.length:null};
-    const med=k=>{const f=vs.filter(s=>s.fwd[k]!=null).map(s=>s.fwd[k]).sort((a,b)=>a-b);return f.length?f[Math.floor(f.length/2)]:null};
-    const wr=k=>{const f=vs.filter(s=>s.fwd[k]!=null);return f.length?f.filter(s=>s.fwd[k]>0).length/f.length:null};
-    const avgDD=vs.reduce((a,s)=>a+s.fwd.maxDD12M,0)/vs.length;
-
-    $('#signal-fwd-metrics').innerHTML=[
-      {l:'Avg 12M Return',v:pct(avg('fwd12M')),c:avg('fwd12M')>0?'positive':'negative',s:`Med: ${pct(med('fwd12M'))}`},
-      {l:'12M Win Rate',v:pct(wr('fwd12M')),c:wr('fwd12M')>0.5?'positive':'negative',s:`${vs.filter(s=>s.fwd.fwd12M!=null&&s.fwd.fwd12M>0).length}/${vs.filter(s=>s.fwd.fwd12M!=null).length}`},
-      {l:'Avg Max DD',v:pct(avgDD),c:'negative',s:`12M post-signal`},
-      {l:'Avg 1M Fwd',v:pct(avg('fwd1M')),c:avg('fwd1M')>0?'positive':'negative',s:`Win: ${pct(wr('fwd1M'))}`}
-    ].map(c=>`<div class="sig-card"><div class="label">${c.l}</div><div class="val ${c.c}">${c.v}</div><div class="sub">${c.s}</div></div>`).join('');
-
-    // Per-event table with averages row
-    let tr=vs.map(s=>{
-      const c=v=>v==null?'':v>0?'positive':'negative';
-      return `<tr><td class="mono">${s.date}</td><td><span class="badge badge-danger">${s.rolling8d}</span></td>
-        <td class="${c(s.fwd.fwd1M)}">${pct(s.fwd.fwd1M)}</td><td class="${c(s.fwd.fwd3M)}">${pct(s.fwd.fwd3M)}</td>
-        <td class="${c(s.fwd.fwd6M)}">${pct(s.fwd.fwd6M)}</td><td class="${c(s.fwd.fwd12M)}">${pct(s.fwd.fwd12M)}</td>
-        <td class="negative">${pct(s.fwd.maxDD12M)}</td></tr>`;
-    }).join('');
-    tr+=`<tr style="font-weight:700;border-top:2px solid var(--border)"><td>AVG</td><td>—</td>
-      <td class="${avg('fwd1M')>0?'positive':'negative'}">${pct(avg('fwd1M'))}</td>
-      <td class="${avg('fwd3M')>0?'positive':'negative'}">${pct(avg('fwd3M'))}</td>
-      <td class="${avg('fwd6M')>0?'positive':'negative'}">${pct(avg('fwd6M'))}</td>
-      <td class="${avg('fwd12M')>0?'positive':'negative'}">${pct(avg('fwd12M'))}</td>
-      <td class="negative">${pct(avgDD)}</td></tr>`;
-    tr+=`<tr style="font-weight:700"><td>MED</td><td>—</td>
-      <td class="${med('fwd1M')>0?'positive':'negative'}">${pct(med('fwd1M'))}</td>
-      <td class="${med('fwd3M')>0?'positive':'negative'}">${pct(med('fwd3M'))}</td>
-      <td class="${med('fwd6M')>0?'positive':'negative'}">${pct(med('fwd6M'))}</td>
-      <td class="${med('fwd12M')>0?'positive':'negative'}">${pct(med('fwd12M'))}</td>
-      <td>—</td></tr>`;
-    $('#signal-fwd-table-wrap').innerHTML=`<table><thead><tr><th>Date</th><th>8D</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>MaxDD</th></tr></thead><tbody>${tr}</tbody></table>`;
-
-    const p12=vs.filter(s=>s.fwd.fwd12M!=null&&s.fwd.fwd12M>0).length,t12=vs.filter(s=>s.fwd.fwd12M!=null).length;
-    $('#signal-interpretation').innerHTML=`<strong>Key finding:</strong> ${p12}/${t12} signals (${(p12/t12*100).toFixed(0)}%) saw positive 12M returns. Avg 12M: ${pct(avg('fwd12M'))}. Avg max DD in 12M after signal: ${pct(avgDD)}. ${avg('fwd3M')<0?'Short-term pain persists ~3M before recovery.':'Recovery tends to begin quickly.'} Median 12M return (${pct(med('fwd12M'))}) ${Math.abs(avg('fwd12M')-med('fwd12M'))>0.05?'differs from mean — distribution is skewed by outliers.':'aligns with mean — consistent behavior.'}`;
-
-    Plotly.newPlot('chart-fwd-paths',vs.map(s=>({x:Array.from({length:s.fwd.path.length},(_,j)=>j),y:s.fwd.path.map(v=>v*100),type:'scatter',mode:'lines',name:s.date,line:{width:mob?1:1.5},opacity:.65})),{...L(),xaxis:{...L().xaxis,title:'Days'},yaxis:{...L().yaxis,title:'Return %'},showlegend:!mob},PC);
-    Plotly.newPlot('chart-fwd-dd',[{x:vs.map(s=>s.fwd.maxDD12M*100),type:'histogram',nbinsx:10,marker:{color:'rgba(220,38,38,.5)',line:{color:'#dc2626',width:1}}}],{...L(),xaxis:{...L().xaxis,title:'Max DD %'}},PC);
-    Plotly.newPlot('chart-ath-dist',[{x:signals.map(s=>s.date),y:signals.map(s=>s.athDist*100),type:'bar',marker:{color:signals.map(s=>s.athDist>-0.05?'#dc2626':'#2563eb')}}],{...L(),yaxis:{...L().yaxis,title:'% from ATH'}},PC);
-
-    const dv=vs.map(s=>s.fwd.maxDD12M),dm2=dv.reduce((a,b)=>a+b,0)/dv.length;
-    const ds=Math.sqrt(dv.reduce((a,v)=>a+(v-dm2)**2,0)/(dv.length-1)),dse=ds/Math.sqrt(dv.length);
-    $('#signal-stats-card').innerHTML=
-      `<div class="qc-item"><span>N</span><span>${vs.length}</span></div>`+
-      `<div class="qc-item"><span>Avg fwd max DD</span><span>${(dm2*100).toFixed(1)}% ± ${(dse*100).toFixed(1)}%</span></div>`+
-      `<div class="qc-item"><span>95% CI</span><span>[${((dm2-1.96*dse)*100).toFixed(1)}%, ${((dm2+1.96*dse)*100).toFixed(1)}%]</span></div>`+
-      `<div class="qc-item"><span>Std Dev</span><span>${(ds*100).toFixed(1)}%</span></div>`+
-      `<div class="qc-item"><span>12M win rate</span><span>${pct(wr('fwd12M'))}</span></div>`+
-      `<div class="qc-item"><span>Median 12M</span><span>${pct(med('fwd12M'))}</span></div>`;
-  }
-
-  // ── EVENTS ──
-  $('#events-tbody').innerHTML=signals.map((s,i)=>{
-    const c=v=>v==null?'':v>0?'positive':'negative';
-    return `<tr><td>${i+1}</td><td class="mono">${s.date}</td><td><span class="badge badge-danger">${s.rolling8d}</span></td>
-      <td class="mono">${fmt(s.spx,0)}</td><td><span class="badge ${s.athDist>-0.05?'badge-danger':'badge-info'}">${pct(s.athDist,0)}</span></td>
-      <td>${s.canaryBad>0?'<span class="badge badge-warn">!</span>':'<span class="badge badge-safe">✓</span>'}</td>
-      <td>${s.aboveSMA200?'<span class="badge badge-safe">↑</span>':'<span class="badge badge-danger">↓</span>'}</td>
-      <td class="${c(s.fwd.fwd1M)}">${pct(s.fwd.fwd1M)}</td><td class="${c(s.fwd.fwd3M)}">${pct(s.fwd.fwd3M)}</td>
-      <td class="${c(s.fwd.fwd6M)}">${pct(s.fwd.fwd6M)}</td><td class="${c(s.fwd.fwd12M)}">${pct(s.fwd.fwd12M)}</td>
-      <td class="negative">${pct(s.fwd.maxDD12M)}</td></tr>`;
-  }).join('');
-
-  // ── RISK ──
-  $('#risk-metrics').innerHTML=S.map(s=>({t:`${s.name}`,v:m[s.key].sharpe.toFixed(2),s:'Sharpe'})).concat([
-    {t:'Comp Sortino',v:m.comp.sortino.toFixed(2)},{t:'Comp Calmar',v:m.comp.calmar.toFixed(2)},{t:'Comp Vol',v:pct(m.comp.vol)}
-  ]).slice(0,8).map(c=>`<div class="card"><div class="card-title">${c.t}${c.s?' '+c.s:''}</div><div class="card-value">${c.v}</div></div>`).join('');
-
-  Plotly.newPlot('chart-monthly-dist',[{x:m.comp.monthly.map(r=>r.ret*100),type:'histogram',nbinsx:30,marker:{color:'rgba(22,163,74,.4)',line:{color:'#15803d',width:1}}}],{...L(),xaxis:{...L().xaxis,title:'Monthly %'}},PC);
-
-  const rr=['comp','bh','enh'].map(k=>{const s=S.find(x=>x.key===k);const rs=[];for(let i=252;i<bt[k].length;i++){const w=[];for(let j=i-251;j<=i;j++)w.push(bt[k][j].equity/bt[k][j-1].equity-1);const wm=w.reduce((a,b)=>a+b,0)/w.length;const wv=Math.sqrt(w.reduce((a,r)=>a+(r-wm)**2,0)/(w.length-1))*Math.sqrt(252);rs.push({d:bt[k][i].date,sh:wv>0?((bt[k][i].equity/bt[k][i-252].equity-1)-0.02)/wv:0})}return{x:rs.map(r=>r.d),y:rs.map(r=>r.sh),type:'scatter',mode:'lines',name:s.name,line:{color:s.color,width:1.5,dash:s.dash}}});
-  Plotly.newPlot('chart-rolling-sharpe',rr,{...L(),yaxis:{...L().yaxis,title:'Sharpe'}},PC);
-
-  // ── QC ──
-  $('#qc-items').innerHTML=qc.map(c=>`<div class="qc-item"><span><strong>[${c.cat}]</strong> ${c.chk}</span><span class="${c.st==='pass'?'qc-pass':c.st==='warn'?'qc-warn':'qc-fail'}">${c.st==='pass'?'✓':'⚠'} ${c.res}</span></div>`).join('');
-  $('#qc-data').innerHTML=`<div class="qc-item"><span>Stocks</span><span>${allData.meta?allData.meta.stockCount:SAMPLE_SIZE}/${SAMPLE_SIZE}</span></div><div class="qc-item"><span>Data</span><span>Adj Close (total return)</span></div><div class="qc-item"><span>Pipeline</span><span>GitHub Actions daily</span></div>`;
-  $('#qc-backtest').innerHTML=`<div class="qc-item"><span>Execution</span><span>Blowup T+1, Regime T+0</span></div><div class="qc-item"><span>Defensive</span><span>IEF (7-10Y UST)</span></div><div class="qc-item"><span>Tx costs</span><span>5bps per allocation change</span></div><div class="qc-item"><span>Strategies</span><span>5 (Enh, Faber, DM, Comp, B&H)</span></div>`;
-  const vs2=signals.filter(s=>s.fwd&&s.fwd.maxDD12M!=null);
-  if(vs2.length>0){const dv=vs2.map(s=>s.fwd.maxDD12M),dm=dv.reduce((a,b)=>a+b,0)/dv.length,ds=Math.sqrt(dv.reduce((a,v)=>a+(v-dm)**2,0)/(dv.length-1)),de=ds/Math.sqrt(dv.length);$('#qc-stats').innerHTML=`<div class="qc-item"><span>N</span><span>${signals.length}</span></div><div class="qc-item"><span>Avg fwd DD</span><span>${(dm*100).toFixed(1)}% ± ${(de*100).toFixed(1)}%</span></div><div class="qc-item"><span>95% CI</span><span>[${((dm-1.96*de)*100).toFixed(1)}%, ${((dm+1.96*de)*100).toFixed(1)}%]</span></div>`}
+// QC
+$('#qc-chk').innerHTML=QC.map(function(c){return '<div class="qi"><span><strong>['+c.cat+']</strong> '+c.chk+'</span><span style="color:'+(c.st==='pass'?'var(--grn)':c.st==='warn'?'var(--amb)':'var(--red)')+'">'+(c.st==='pass'?'✓':'⚠')+' '+c.res+'</span></div>'}).join('');
+$('#qc-data').innerHTML=[['Stocks',(AD.meta?AD.meta.stockCount:90)+'/90'],['Data','Adj Close (total return)'],['Pipeline','GitHub Actions (daily)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
+$('#qc-bt').innerHTML=[['Execution','Stress T+1, Regime T+0'],['Defensive','IEF (7-10Y UST)'],['Tx Costs','5bps per allocation change'],['Strategies','5 (Enh, Faber, DM, Comp, B&H)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
+var vs2=SIG.filter(function(s){return s.fwd&&s.fwd.maxDD12M!=null});
+if(vs2.length>0){var dv2=vs2.map(function(s){return s.fwd.maxDD12M}),dm2=dv2.reduce(function(a,b){return a+b},0)/dv2.length,ds2=Math.sqrt(dv2.reduce(function(a,v){return a+(v-dm2)*(v-dm2)},0)/(dv2.length-1)),de2=ds2/Math.sqrt(dv2.length);$('#qc-st').innerHTML=[['N',SIG.length],['Avg fwd DD',(dm2*100).toFixed(1)+'% ±'+(de2*100).toFixed(1)+'%'],['95% CI','['+((dm2-1.96*de2)*100).toFixed(1)+'%, '+((dm2+1.96*de2)*100).toFixed(1)+'%]']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('')}
 }
 
 // TABS
-$$('.tab-btn').forEach(b=>{
-  b.addEventListener('click',()=>{
-    $$('.tab-btn').forEach(x=>x.classList.remove('active'));
-    $$('.tab-panel').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    document.getElementById(b.dataset.tab).classList.add('active');
-    setTimeout(()=>window.dispatchEvent(new Event('resize')),80);
+$$('.tab').forEach(function(b){
+  b.addEventListener('click',function(){
+    $$('.tab').forEach(function(x){x.classList.remove('on')});
+    $$('.pnl').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById(b.dataset.t).classList.add('on');
+    setTimeout(function(){window.dispatchEvent(new Event('resize'))},80);
   });
 });
 
@@ -475,20 +197,16 @@ $$('.tab-btn').forEach(b=>{
 function main(){
   try{
     setBar(10);setStatus('Loading…');
-    if(typeof PRECOMPUTED_DATA==='undefined') throw new Error('No data. Run pipeline.py first.');
-    const d=PRECOMPUTED_DATA;
+    if(typeof PRECOMPUTED_DATA==='undefined') throw new Error('No data — run pipeline.py');
+    var d=PRECOMPUTED_DATA;
     setBar(60);setStatus('Rendering…');
     render({rolling:d.rolling,signals:d.signals,bt:d.bt,m:d.metrics,qc:d.qc,allData:{meta:d.meta}});
-    setBar(100);log('✅ Loaded');
-    log(`${d.meta.startDate} → ${d.meta.endDate} · ${d.meta.signalCount} signals`);
-    try{$('#cache-status').textContent=`Updated: ${d.meta.endDate}`}catch(e){}
-    setTimeout(()=>{$('#loading').style.opacity='0';$('#loading').style.transition='opacity .4s';setTimeout(()=>$('#loading').style.display='none',400)},300);
-  }catch(err){
-    setStatus(`Error: ${err.message}`);log(`❌ ${err.stack}`);$('#load-bar').style.background='#dc2626';
-  }
+    setBar(100);log('✅ Ready');
+    try{$('#cache-status').textContent='Updated: '+d.meta.endDate}catch(e){}
+    setTimeout(function(){$('#loading').style.opacity='0';$('#loading').style.transition='opacity .35s';setTimeout(function(){$('#loading').style.display='none'},350)},200);
+  }catch(e){setStatus(e.message);log('❌ '+e.stack);$('#load-bar').style.background='#dc2626'}
 }
-function w(){if(typeof Plotly==='undefined'){setTimeout(w,100);return}main()}
-w();
+(function w(){typeof Plotly==='undefined'?setTimeout(w,100):main()})();
 </script>
 </body>
 </html>

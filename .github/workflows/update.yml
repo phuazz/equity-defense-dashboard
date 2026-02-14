@@ -1,4 +1,4 @@
-name: Update Blowup Signal Dashboard
+name: Update S&P 500 Risk Overlay
 
 on:
   schedule:

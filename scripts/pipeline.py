@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Blowup Signal v3 — Daily Pipeline
+S&P 500 Risk Overlay — Daily Pipeline
 Fetches data, computes signals, generates static HTML dashboard.
 
 Usage:
@@ -30,7 +30,7 @@ OUTPUT_PATH = ROOT / "docs" / "index.html"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Blowup Signal pipeline")
+    parser = argparse.ArgumentParser(description="S&P 500 Risk Overlay pipeline")
     parser.add_argument("--provider", default="yahoo", choices=["yahoo", "alphavantage"])
     parser.add_argument("--no-cache", action="store_true", help="Skip cache, full refetch")
     parser.add_argument("--output", default=str(OUTPUT_PATH))
@@ -38,7 +38,7 @@ def main():
     args = parser.parse_args()
 
     log.info("=" * 60)
-    log.info("Blowup Signal v3 — Pipeline Run")
+    log.info("S&P 500 Risk Overlay — Pipeline Run")
     log.info(f"Provider: {args.provider} | Cache: {not args.no_cache}")
     log.info("=" * 60)
 
