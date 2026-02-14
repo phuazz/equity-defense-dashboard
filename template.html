@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blowup Signal v3 — Multi-Strategy Defensive Backtest + Signal Monitor</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#ffffff;--surface:#f8f9fa;--card:#ffffff;--border:#e2e5e9;--border-hi:#c8cdd3;
+  --t1:#1a1a2e;--t2:#555b6e;--t3:#8e95a5;
+  --green:#15803d;--green-l:#16a34a;--green-bg:rgba(22,163,74,.06);
+  --red:#dc2626;--red-l:#ef4444;--red-bg:rgba(220,38,38,.05);
+  --blue:#2563eb;--blue-bg:rgba(37,99,235,.05);
+  --amber:#b45309;--amber-bg:rgba(180,83,9,.05);
+  --cyan:#0891b2;--purple:#7c3aed;
+}
+html{font-size:15px}
+body{font-family:'Source Sans 3',Georgia,system-ui,sans-serif;background:var(--bg);color:var(--t1);line-height:1.65;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:.88em}
+
+/* LOADING */
+#loading{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#loading h2{font-family:'Source Serif 4',Georgia,serif;font-size:28px;font-weight:600;color:var(--t1)}
+#load-bar-wrap{width:360px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+#load-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .3s}
+#load-status{color:var(--t2);font-size:13px}
+#load-log{color:var(--t3);font-size:11px;font-family:'IBM Plex Mono',monospace;max-height:140px;overflow-y:auto;width:480px;text-align:center;margin-top:8px}
+#cache-controls{margin-top:12px;display:flex;gap:8px;align-items:center}
+#cache-controls button{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;color:var(--t2);transition:all .15s}
+#cache-controls button:hover{background:var(--border);color:var(--t1)}
+#cache-status{font-size:11px;color:var(--t3)}
+
+/* MASTHEAD */
+.masthead{background:var(--surface);border-bottom:1px solid var(--border);padding:28px 32px 22px}
+.masthead-inner{max-width:1480px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px}
+.masthead h1{font-family:'Source Serif 4',Georgia,serif;font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--t1)}
+.masthead h1 em{font-style:italic;color:var(--red)}
+.masthead-sub{color:var(--t2);font-size:13px;margin-top:4px;max-width:700px;line-height:1.5}
+.masthead-meta{color:var(--t2);font-size:13px;text-align:right}
+.masthead-meta .mono{color:var(--t1)}
+
+/* TABS */
+.tabs-bar{background:var(--bg);border-bottom:1px solid var(--border);padding:0 32px;position:sticky;top:0;z-index:100}
+.tabs-inner{max-width:1480px;margin:0 auto;display:flex;gap:0;overflow-x:auto}
+.tab-btn{background:none;border:none;color:var(--t3);font-family:'Source Sans 3',sans-serif;font-size:13px;font-weight:600;padding:12px 20px;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.tab-btn:hover{color:var(--t1)}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-panel{display:none;max-width:1480px;margin:0 auto;padding:24px 32px 48px}
+.tab-panel.active{display:block}
+
+/* CARDS */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g5{grid-template-columns:repeat(5,1fr)}
+.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:1000px){.g2,.g3,.g4,.g5,.g6{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.g2,.g3,.g4,.g5,.g6{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px 20px}
+.card-title{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:4px;font-weight:600}
+.card-value{font-size:24px;font-weight:700;letter-spacing:-.5px;font-family:'IBM Plex Mono',monospace}
+.card-sub{font-size:12px;color:var(--t2);margin-top:3px}
+.positive{color:var(--green)}
+.negative{color:var(--red)}
+.neutral{color:var(--amber)}
+
+.section-title{font-family:'Source Serif 4',Georgia,serif;font-size:20px;font-weight:600;margin:28px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border);color:var(--t1)}
+
+/* CHART */
+.chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin:16px 0}
+.chart-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:8px;font-weight:600}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:10px 12px;background:var(--surface);border-bottom:2px solid var(--border);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--t2);position:sticky;top:40px;z-index:10}
+tbody td{padding:8px 12px;border-bottom:1px solid var(--border)}
+tbody tr:hover{background:rgba(37,99,235,.02)}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+.badge-danger{background:var(--red-bg);color:var(--red)}
+.badge-safe{background:var(--green-bg);color:var(--green)}
+.badge-warn{background:var(--amber-bg);color:var(--amber)}
+.badge-info{background:var(--blue-bg);color:var(--blue)}
+
+/* SIGNAL BOX */
+.signal-box{border:1px solid var(--red);border-radius:8px;padding:16px 20px;background:var(--red-bg);margin:16px 0}
+.signal-box h3{color:var(--red);font-size:14px;margin-bottom:8px;font-weight:700}
+.signal-box p{color:var(--t2);font-size:13px;line-height:1.6}
+.improve-box{border:1px solid var(--green);border-radius:8px;padding:16px 20px;background:var(--green-bg);margin:16px 0}
+.improve-box h3{color:var(--green);font-size:14px;margin-bottom:8px;font-weight:700}
+.improve-box p,.improve-box li{color:var(--t2);font-size:13px;line-height:1.7}
+.improve-box ul{margin:8px 0 0 20px}
+
+/* METHOD STEPS */
+.method-step{display:flex;gap:16px;align-items:flex-start;margin:12px 0;padding:12px 16px;border-left:3px solid var(--border);transition:border-color .2s}
+.method-step:hover{border-left-color:var(--blue)}
+.step-num{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--blue);min-width:32px}
+.step-text h4{font-size:14px;margin-bottom:4px;font-weight:700}
+.step-text p{color:var(--t2);font-size:13px}
+
+/* NOTE */
+.note-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin:16px 0;font-size:13px;color:var(--t2);line-height:1.6}
+.note-box strong{color:var(--t1)}
+
+/* QC */
+.qc-box{border:2px solid var(--amber);border-radius:8px;padding:20px;background:var(--amber-bg);margin:20px 0}
+.qc-box h3{color:var(--amber);font-size:16px;margin-bottom:12px;font-family:'Source Serif 4',serif;font-weight:700}
+.qc-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(180,83,9,.12);font-size:13px;gap:12px}
+.qc-item:last-child{border:none}
+.qc-item span:first-child{flex:1}
+.qc-item span:last-child{text-align:right;flex-shrink:0;max-width:55%}
+.qc-pass{color:var(--green)}
+.qc-fail{color:var(--red)}
+.qc-warn{color:var(--amber)}
+
+/* COMPARISON TABLE */
+.compare-table{margin:16px 0}
+.compare-table th{background:var(--blue-bg);color:var(--blue)}
+.compare-table .winner{font-weight:700}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h2>Blowup Signal v3 — Loading Dashboard</h2>
+  <div id="load-bar-wrap"><div id="load-bar"></div></div>
+  <div id="load-status">Initializing…</div>
+  <div id="load-log"></div>
+  <div id="cache-controls">
+    <button onclick="clearCache()">Clear Cached Data</button>
+    <span id="cache-status"></span>
+  </div>
+</div>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div>
+      <h1>Blowup Signal v3 — <em>Multi-Strategy Defensive Backtest</em></h1>
+      <div class="masthead-sub">
+        5 Defensive Strategies Compared: Blowup+Canary+200d · Faber 10-Month SMA · Antonacci Dual Momentum · 
+        Composite (all signals) · Buy &amp; Hold · Total Return · Live Signal Monitor
+      </div>
+    </div>
+    <div class="masthead-meta">
+      <div class="mono" id="meta-period">—</div>
+      <div class="mono" id="meta-signals">—</div>
+      <div id="meta-cache" style="font-size:11px;color:var(--t3);margin-top:4px">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <div class="tabs-inner">
+    <button class="tab-btn active" data-tab="tab-monitor">Signal Monitor</button>
+    <button class="tab-btn" data-tab="tab-overview">Overview</button>
+    <button class="tab-btn" data-tab="tab-comparison">Strategy Comparison</button>
+    <button class="tab-btn" data-tab="tab-signal">Signal Analysis</button>
+    <button class="tab-btn" data-tab="tab-strategies">Strategy Descriptions</button>
+    <button class="tab-btn" data-tab="tab-events">Signal Events</button>
+    <button class="tab-btn" data-tab="tab-risk">Risk Analytics</button>
+    <button class="tab-btn" data-tab="tab-qc">QC / Audit</button>
+  </div>
+</div>
+
+<!-- SIGNAL MONITOR -->
+<div class="tab-panel active" id="tab-monitor">
+  <div class="section-title">Current Signal Status — As of Latest Data</div>
+  <div class="grid g3" id="monitor-cards"></div>
+  <div class="note-box" id="monitor-summary" style="margin:20px 0;font-size:14px;line-height:1.7"></div>
+  <div class="grid g2">
+    <div>
+      <div class="section-title" style="font-size:16px">Signal Component Breakdown</div>
+      <div id="monitor-details" class="card" style="font-size:13px"></div>
+    </div>
+    <div>
+      <div class="section-title" style="font-size:16px">What Each Signal Means</div>
+      <div class="card" style="font-size:13px;line-height:1.7">
+        <div class="qc-item"><span><strong>Blowup Count</strong></span><span>Rolling 8-day count of stocks down 7%+. ≥115 = acute stress</span></div>
+        <div class="qc-item"><span><strong>SPX vs 200d MA</strong></span><span>Above = uptrend. Below = bear regime (Faber, Siegel)</span></div>
+        <div class="qc-item"><span><strong>Canary (VWO/BND)</strong></span><span>Negative momentum = cross-asset stress (Keller 2018)</span></div>
+        <div class="qc-item"><span><strong>SPY 12M Return</strong></span><span>Absolute momentum. Negative = risk-off (Antonacci 2014)</span></div>
+        <div class="qc-item"><span><strong>SPX vs 10M SMA</strong></span><span>Faber's monthly timing rule. Below = defensive</span></div>
+        <div class="qc-item"><span><strong>Composite</strong></span><span>0–5 triggers active. ≥2 = partial, ≥3 = full defensive</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="chart-wrap"><div class="chart-label">Composite Defensive Score History (0=Clear, 5=Max Stress)</div><div id="chart-composite-ts" style="height:250px"></div></div>
+</div>
+
+<!-- OVERVIEW -->
+<div class="tab-panel" id="tab-overview">
+  <div class="grid g5" id="overview-metrics"></div>
+  <div class="chart-wrap"><div class="chart-label">S&P 500 (Total Return) with Blowup Signal Events</div><div id="chart-equity" style="height:400px"></div></div>
+  <div class="grid g2">
+    <div class="chart-wrap"><div class="chart-label">Drawdown — All Strategies</div><div id="chart-dd" style="height:280px"></div></div>
+    <div class="chart-wrap"><div class="chart-label">Rolling 8-Day Blowup Count</div><div id="chart-blowup" style="height:280px"></div></div>
+  </div>
+  <div class="chart-wrap"><div class="chart-label">Equity Curves — All Strategies (Log Scale)</div><div id="chart-strat" style="height:400px"></div></div>
+</div>
+
+<!-- COMPARISON -->
+<div class="tab-panel" id="tab-comparison">
+  <div class="section-title">Head-to-Head: 5 Strategies</div>
+  <div id="compare-table-wrap"></div>
+  <div class="chart-wrap"><div class="chart-label">Annual Returns by Strategy</div><div id="chart-annual" style="height:360px"></div></div>
+  <div class="grid g2">
+    <div class="chart-wrap"><div class="chart-label">Drawdowns: Composite vs Buy &amp; Hold</div><div id="chart-dd-compare" style="height:280px"></div></div>
+    <div class="chart-wrap"><div class="chart-label">Defensive Allocation % (Composite)</div><div id="chart-alloc" style="height:280px"></div></div>
+  </div>
+</div>
+
+<!-- SIGNAL ANALYSIS -->
+<div class="tab-panel" id="tab-signal">
+  <div class="section-title">Forward Return Analysis After Blowup Signals</div>
+  <div class="grid g4" id="signal-fwd-metrics"></div>
+  <div class="chart-wrap"><div class="chart-label">Forward Return Paths (12M After Each Signal)</div><div id="chart-fwd-paths" style="height:380px"></div></div>
+  <div class="grid g2">
+    <div class="chart-wrap"><div class="chart-label">Forward Max Drawdown vs Batnik's -34%</div><div id="chart-fwd-dd" style="height:280px"></div></div>
+    <div class="chart-wrap"><div class="chart-label">SPX Distance from ATH at Signal</div><div id="chart-ath-dist" style="height:280px"></div></div>
+  </div>
+</div>
+
+<!-- STRATEGIES -->
+<div class="tab-panel" id="tab-strategies">
+  <div class="section-title">5 Defensive Strategies</div>
+  <div class="improve-box"><h3>S1: Enhanced Blowup (Blowup + Canary + 200d MA)</h3>
+    <p><strong>Trigger:</strong> Blowup count ≥115 OR (SPX &lt; 200d MA AND canary bad). <strong>Exit to:</strong> IEF. <strong>Re-entry:</strong> SPX &gt; 200d MA + canary clear + 63d cooldown. Sources: Batnik, Keller 2018, Faber 2007.</p></div>
+  <div class="improve-box"><h3>S2: Faber 10-Month SMA</h3>
+    <p><strong>Rule:</strong> Monthly — SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007). Backtested to 1886. Catches slow bears. Weakness: whipsaws in choppy markets.</p></div>
+  <div class="improve-box"><h3>S3: Dual Momentum (Antonacci GEM-Inspired)</h3>
+    <p><strong>Rule:</strong> Monthly — if SPY 12M return &gt; IEF 12M return AND SPY 12M &gt; 0 → SPY, else → IEF. Source: Antonacci (2014), Dow Award winner. Combines absolute + relative momentum.</p></div>
+  <div class="improve-box"><h3>S4: Composite (Any 2 of 5)</h3>
+    <p><strong>Rule:</strong> 5 sub-signals scored 0/1. Score ≥2 → 100% IEF, score=1 → 50% IEF. Requires multi-signal confirmation to reduce false positives.</p></div>
+  <div class="improve-box"><h3>S5: Buy &amp; Hold</h3>
+    <p>100% SPY total return. Zero costs. Benchmark for all defensive strategies.</p></div>
+</div>
+
+<!-- EVENTS -->
+<div class="tab-panel" id="tab-events">
+  <div class="section-title">Blowup Signal Event Log</div>
+  <div style="overflow-x:auto;max-height:600px;overflow-y:auto">
+    <table id="events-table"><thead><tr>
+      <th>#</th><th>Date</th><th>8D Count</th><th>SPX</th><th>From ATH</th><th>Canary</th><th>vs 200d</th><th>Fwd 1M</th><th>Fwd 3M</th><th>Fwd 6M</th><th>Fwd 12M</th><th>Max DD</th>
+    </tr></thead><tbody id="events-tbody"></tbody></table>
+  </div>
+</div>
+
+<!-- RISK -->
+<div class="tab-panel" id="tab-risk">
+  <div class="section-title">Risk-Adjusted Performance</div>
+  <div class="grid g4" id="risk-metrics"></div>
+  <div class="grid g2">
+    <div class="chart-wrap"><div class="chart-label">Monthly Return Distribution — Composite</div><div id="chart-monthly-dist" style="height:280px"></div></div>
+    <div class="chart-wrap"><div class="chart-label">Rolling 12M Sharpe — All Strategies</div><div id="chart-rolling-sharpe" style="height:280px"></div></div>
+  </div>
+</div>
+
+<!-- QC -->
+<div class="tab-panel" id="tab-qc">
+  <div class="section-title">Senior Quant PM — Quality Control Audit</div>
+  <div class="qc-box"><h3>Second-Check Validation Report</h3><div id="qc-items"></div></div>
+  <div class="section-title">Data Quality</div><div class="card" id="qc-data"></div>
+  <div class="section-title">Backtest Integrity</div><div class="card" id="qc-backtest"></div>
+  <div class="section-title">Statistical Significance</div><div class="card" id="qc-stats"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// PRE-COMPUTED DATA (injected by pipeline.py)
+// ═══════════════════════════════════════════════════════════════════
+/* __INJECT_DATA__ */
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+function setBar(p){$('#load-bar').style.width=p+'%'}
+function setStatus(s){$('#load-status').textContent=s}
+function log(s){const d=$('#load-log');d.innerHTML+=s+'<br>';d.scrollTop=d.scrollHeight}
+function pct(v,d=1){return v==null?'—':(v>=0?'+':'')+((v*100).toFixed(d))+'%'}
+function fmt(v,d=0){return v==null?'—':v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d})}
+
+const LIGHT_LAYOUT=(title='')=>({
+  paper_bgcolor:'transparent',plot_bgcolor:'transparent',
+  font:{family:'Source Sans 3',size:12,color:'#555b6e'},
+  title:title?{text:title,font:{size:14,color:'#1a1a2e'}}:undefined,
+  margin:{t:title?40:20,r:20,b:40,l:60},
+  xaxis:{gridcolor:'#e2e5e9',linecolor:'#e2e5e9',zerolinecolor:'#e2e5e9'},
+  yaxis:{gridcolor:'#e2e5e9',linecolor:'#e2e5e9',zerolinecolor:'#e2e5e9'},
+  legend:{bgcolor:'transparent',font:{size:11}},
+  hovermode:'x unified'
+});
+const PC={responsive:true,displayModeBar:false};
+const EXTRA_TICKERS=['VWO','BND','IEF','TLT','SHY'];
+const SAMPLE_SIZE=90;
+
+function render(data){
+  const{rolling,signals,bt,m,qc,allData}=data;
+  const last=rolling[rolling.length-1];
+  const STRATS=[
+    {key:'enh',name:'Enhanced Blowup',color:'#dc2626',dash:undefined},
+    {key:'fab',name:'Faber 10M SMA',color:'#7c3aed',dash:'dot'},
+    {key:'dm',name:'Dual Momentum',color:'#b45309',dash:'dashdot'},
+    {key:'comp',name:'Composite (≥2/5)',color:'#15803d',dash:undefined},
+    {key:'bh',name:'Buy & Hold',color:'#8e95a5',dash:undefined}
+  ];
+  
+  $('#meta-period').textContent=`${rolling[0].date} → ${last.date} (${m.bh.yrs.toFixed(1)}y)`;
+  $('#meta-signals').textContent=`${signals.length} blowup signals · Composite: ${last.compositeScore}/5`;
+  
+  // === SIGNAL MONITOR ===
+  const blowupAct=last.rolling8d>=115,below200=last.sma200!=null&&last.spx<last.sma200;
+  const canBad=last.canaryBad>=1,spy12neg=last.spy12mNeg,below10=last.belowSMA10m;
+  const cs=last.compositeScore;
+  const csC=cs>=3?'negative':cs>=2?'neutral':cs>=1?'neutral':'positive';
+  const csL=cs>=3?'HIGH RISK — Full Defensive':cs>=2?'ELEVATED — Full Defensive':cs===1?'CAUTION — Partial':'ALL CLEAR — Fully Invested';
+  
+  $('#monitor-cards').innerHTML=[
+    {t:'Composite Score',v:`${cs}/5`,c:csC,s:csL},
+    {t:'SPX Level',v:fmt(last.spx,1),c:'',s:`${last.aboveSMA200?'Above':'Below'} 200d MA (${fmt(last.sma200,1)})`},
+    {t:'Blowup 8D Count',v:last.rolling8d,c:blowupAct?'negative':'positive',s:`Threshold: 115${blowupAct?' — ACTIVE':''}`}
+  ].map(c=>`<div class="card"><div class="card-title">${c.t}</div><div class="card-value ${c.c}">${c.v}</div><div class="card-sub">${c.s}</div></div>`).join('');
+  
+  const si=v=>v?'<span class="badge badge-danger">RISK</span>':'<span class="badge badge-safe">OK</span>';
+  $('#monitor-details').innerHTML=`
+    <div class="qc-item"><span>1. Blowup ≥ 115</span><span>${si(blowupAct)} Count: ${last.rolling8d}</span></div>
+    <div class="qc-item"><span>2. SPX < 200d MA</span><span>${si(below200)} ${fmt(last.spx,1)} vs ${last.sma200?fmt(last.sma200,1):'N/A'}</span></div>
+    <div class="qc-item"><span>3. Canary bad (VWO/BND)</span><span>${si(canBad)} ${last.canaryBad}/${last.canaryTotal} negative</span></div>
+    <div class="qc-item"><span>4. SPY 12M < 0</span><span>${si(spy12neg)} ${last.spy12mRet!=null?pct(last.spy12mRet):'N/A'}</span></div>
+    <div class="qc-item"><span>5. SPX < 10M SMA</span><span>${si(below10)} vs ${last.sma10m?fmt(last.sma10m,1):'N/A'}</span></div>
+    <div class="qc-item" style="border-top:2px solid var(--border);padding-top:8px;margin-top:4px"><span><strong>COMPOSITE</strong></span><span><strong class="${csC}">${cs}/5 → ${csL}</strong></span></div>`;
+  
+  const sBg=cs>=2?'background:var(--red-bg);border-color:var(--red)':cs>=1?'background:var(--amber-bg);border-color:var(--amber)':'background:var(--green-bg);border-color:var(--green)';
+  $('#monitor-summary').style.cssText=`margin:20px 0;font-size:14px;line-height:1.7;border:1px solid;border-radius:8px;padding:16px;${sBg}`;
+  const aT=cs>=2?'<strong>fully defensive</strong> — 100% IEF':cs===1?'<strong>partially defensive</strong> — 50% IEF':'<strong>fully invested</strong> — 100% SPY';
+  $('#monitor-summary').innerHTML=`<strong>Current Action (${last.date}):</strong> The Composite strategy would be ${aT}. ${cs>=2?'Multiple independent indicators confirm elevated risk.':cs===1?'One indicator flagging.':'All 5 indicators green.'}`;
+  
+  Plotly.newPlot('chart-composite-ts',[
+    {x:rolling.map(r=>r.date),y:rolling.map(r=>r.compositeScore),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.1)',name:'Score'},
+    {x:[rolling[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'Full Def ≥2',line:{color:'#b45309',dash:'dash',width:1}}
+  ],{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'Score',range:[0,5.5]}},PC);
+  
+  // === OVERVIEW ===
+  $('#overview-metrics').innerHTML=[
+    {t:'B&H CAGR',v:pct(m.bh.cagr),c:'positive'},
+    {t:'Composite CAGR',v:pct(m.comp.cagr),c:m.comp.cagr>0?'positive':'negative'},
+    {t:'B&H Max DD',v:pct(m.bh.maxDD),c:'negative'},
+    {t:'Composite Max DD',v:pct(m.comp.maxDD),c:m.comp.maxDD>m.bh.maxDD?'positive':'negative'},
+    {t:'Blowup Signals',v:signals.length,c:'neutral'}
+  ].map(c=>`<div class="card"><div class="card-title">${c.t}</div><div class="card-value ${c.c}">${c.v}</div></div>`).join('');
+  
+  Plotly.newPlot('chart-equity',[
+    {x:rolling.map(r=>r.date),y:rolling.map(r=>r.spx),type:'scatter',mode:'lines',name:'S&P 500 (TR)',line:{color:'#2563eb',width:1.5}},
+    {x:signals.map(s=>s.date),y:signals.map(s=>s.spx),type:'scatter',mode:'markers',name:'Blowup',marker:{color:'#dc2626',size:9,line:{color:'#fff',width:1.5}}}
+  ],{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,type:'log',title:'SPY Adj (log)'}},PC);
+  
+  const ddT=STRATS.map(s=>({x:bt[s.key].map(e=>e.date),y:bt[s.key].map(e=>e.dd*100),type:'scatter',name:s.name,line:{color:s.color,width:s.key==='comp'?1.5:1,dash:s.dash},fill:s.key==='comp'?'tozeroy':undefined,fillcolor:s.key==='comp'?'rgba(22,163,74,.06)':undefined}));
+  Plotly.newPlot('chart-dd',ddT,{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'Drawdown %'}},PC);
+  
+  Plotly.newPlot('chart-blowup',[
+    {x:rolling.map(r=>r.date),y:rolling.map(r=>r.rolling8d),type:'scatter',mode:'lines',name:'8D Count',line:{color:'#b45309',width:1}},
+    {x:[rolling[0].date,last.date],y:[115,115],type:'scatter',mode:'lines',name:'Threshold',line:{color:'#dc2626',width:2,dash:'dash'}}
+  ],{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'Count'}},PC);
+  
+  Plotly.newPlot('chart-strat',STRATS.map(s=>({x:bt[s.key].map(e=>e.date),y:bt[s.key].map(e=>e.equity),type:'scatter',mode:'lines',name:s.name,line:{color:s.color,width:s.key==='comp'?2.5:1.5,dash:s.dash}})),{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,type:'log',title:'Equity ($)'}},PC);
+  
+  // === COMPARISON ===
+  const sKeys=['bh','enh','fab','dm','comp'],sNames=['Buy & Hold','Enh Blowup','Faber 10M','Dual Mom','Composite'];
+  const mList=['cagr','totalRet','maxDD','vol','sharpe','sortino','calmar','winRate','defFrac'];
+  const mLabels=['CAGR','Total Return','Max Drawdown','Volatility','Sharpe','Sortino','Calmar','Win Rate','Def %'];
+  const cRows=mLabels.map((l,i)=>{
+    const vals=sKeys.map(sk=>{const v=m[sk][mList[i]];return i<=3||i>=7?pct(v):v.toFixed(2)});
+    return `<tr><td><strong>${l}</strong></td>${vals.map(v=>`<td class="mono">${v}</td>`).join('')}</tr>`;
+  });
+  $('#compare-table-wrap').innerHTML=`<table class="compare-table"><thead><tr><th>Metric</th>${sNames.map(n=>`<th>${n}</th>`).join('')}</tr></thead><tbody>${cRows.join('')}</tbody></table>`;
+  
+  Plotly.newPlot('chart-annual',STRATS.map(s=>({x:m[s.key].annual.map(a=>a.year),y:m[s.key].annual.map(a=>a.ret*100),type:'bar',name:s.name,marker:{color:s.color,opacity:.6}})),{...LIGHT_LAYOUT(),barmode:'group',yaxis:{...LIGHT_LAYOUT().yaxis,title:'Return %'}},PC);
+  
+  Plotly.newPlot('chart-dd-compare',[
+    {x:bt.bh.map(e=>e.date),y:bt.bh.map(e=>e.dd*100),type:'scatter',fill:'tozeroy',name:'Buy & Hold',line:{color:'#8e95a5',width:1},fillcolor:'rgba(142,149,165,.06)'},
+    {x:bt.comp.map(e=>e.date),y:bt.comp.map(e=>e.dd*100),type:'scatter',fill:'tozeroy',name:'Composite',line:{color:'#15803d',width:1.5},fillcolor:'rgba(22,163,74,.06)'}
+  ],{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'Drawdown %'}},PC);
+  
+  Plotly.newPlot('chart-alloc',[{x:bt.comp.map(e=>e.date),y:bt.comp.map(e=>e.mode==='defensive'?100:e.mode==='partial'?50:0),type:'scatter',fill:'tozeroy',name:'Def %',line:{color:'#b45309',width:0},fillcolor:'rgba(180,83,9,.2)'}],{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'%',range:[0,110]}},PC);
+  
+  // === SIGNAL ANALYSIS ===
+  const vs=signals.filter(s=>s.fwd.maxDD12M!=null);
+  if(vs.length>0){
+    const avg=k=>vs.filter(s=>s.fwd[k]!=null).reduce((a,s)=>a+s.fwd[k],0)/vs.filter(s=>s.fwd[k]!=null).length;
+    const avgDD=vs.reduce((a,s)=>a+s.fwd.maxDD12M,0)/vs.length;
+    $('#signal-fwd-metrics').innerHTML=[
+      {t:'Avg Fwd 1M',v:pct(avg('fwd1M')),c:avg('fwd1M')>0?'positive':'negative'},
+      {t:'Avg Fwd 3M',v:pct(avg('fwd3M')),c:avg('fwd3M')>0?'positive':'negative'},
+      {t:'Avg Fwd 6M',v:pct(avg('fwd6M')),c:avg('fwd6M')>0?'positive':'negative'},
+      {t:'Avg Max DD',v:pct(avgDD),c:'negative',s:'Batnik: -34%'}
+    ].map(c=>`<div class="card"><div class="card-title">${c.t}</div><div class="card-value ${c.c}">${c.v}</div>${c.s?`<div class="card-sub">${c.s}</div>`:''}</div>`).join('');
+    Plotly.newPlot('chart-fwd-paths',vs.map((s,i)=>({x:Array.from({length:s.fwd.path.length},(_,j)=>j),y:s.fwd.path.map(v=>v*100),type:'scatter',mode:'lines',name:s.date,line:{width:1.5},opacity:.7})),{...LIGHT_LAYOUT(),xaxis:{...LIGHT_LAYOUT().xaxis,title:'Days'},yaxis:{...LIGHT_LAYOUT().yaxis,title:'Return %'},showlegend:true},PC);
+    Plotly.newPlot('chart-fwd-dd',[{x:vs.map(s=>s.fwd.maxDD12M*100),type:'histogram',nbinsx:12,marker:{color:'rgba(220,38,38,.5)',line:{color:'#dc2626',width:1}}},{x:[-34,-34],y:[0,vs.length],type:'scatter',mode:'lines',name:'-34%',line:{color:'#b45309',width:2,dash:'dash'}}],{...LIGHT_LAYOUT(),xaxis:{...LIGHT_LAYOUT().xaxis,title:'Max DD %'}},PC);
+    Plotly.newPlot('chart-ath-dist',[{x:signals.map(s=>s.date),y:signals.map(s=>s.athDist*100),type:'bar',marker:{color:signals.map(s=>s.athDist>-0.05?'#dc2626':'#2563eb')}}],{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'% From ATH'}},PC);
+  }
+  
+  // === EVENTS ===
+  $('#events-tbody').innerHTML=signals.map((s,i)=>{
+    const cl=v=>v==null?'':v>0?'positive':'negative';
+    return `<tr><td>${i+1}</td><td class="mono">${s.date}</td><td><span class="badge badge-danger">${s.rolling8d}</span></td>
+      <td class="mono">${fmt(s.spx,1)}</td><td><span class="badge ${s.athDist>-0.05?'badge-danger':'badge-info'}">${pct(s.athDist)}</span></td>
+      <td>${s.canaryBad>0?`<span class="badge badge-warn">${s.canaryBad} bad</span>`:'<span class="badge badge-safe">OK</span>'}</td>
+      <td>${s.aboveSMA200?'<span class="badge badge-safe">Above</span>':'<span class="badge badge-danger">Below</span>'}</td>
+      <td class="${cl(s.fwd.fwd1M)}">${pct(s.fwd.fwd1M)}</td><td class="${cl(s.fwd.fwd3M)}">${pct(s.fwd.fwd3M)}</td>
+      <td class="${cl(s.fwd.fwd6M)}">${pct(s.fwd.fwd6M)}</td><td class="${cl(s.fwd.fwd12M)}">${pct(s.fwd.fwd12M)}</td>
+      <td class="negative">${pct(s.fwd.maxDD12M)}</td></tr>`;
+  }).join('');
+  
+  // === RISK ===
+  $('#risk-metrics').innerHTML=STRATS.map(s=>({t:`${s.name} Sharpe`,v:m[s.key].sharpe.toFixed(2)})).concat([
+    {t:'Comp Sortino',v:m.comp.sortino.toFixed(2)},{t:'Comp Calmar',v:m.comp.calmar.toFixed(2)},{t:'Comp Vol',v:pct(m.comp.vol)}
+  ]).slice(0,8).map(c=>`<div class="card"><div class="card-title">${c.t}</div><div class="card-value">${c.v}</div></div>`).join('');
+  
+  Plotly.newPlot('chart-monthly-dist',[{x:m.comp.monthly.map(mr=>mr.ret*100),type:'histogram',nbinsx:30,marker:{color:'rgba(22,163,74,.4)',line:{color:'#15803d',width:1}}}],{...LIGHT_LAYOUT(),xaxis:{...LIGHT_LAYOUT().xaxis,title:'Monthly Return %'}},PC);
+  
+  const rsT=['comp','bh','enh'].map(k=>{const s=STRATS.find(x=>x.key===k);const rs=[];for(let i=252;i<bt[k].length;i++){const w=[];for(let j=i-251;j<=i;j++)w.push(bt[k][j].equity/bt[k][j-1].equity-1);const wm=w.reduce((a,b)=>a+b,0)/w.length;const wv=Math.sqrt(w.reduce((a,r)=>a+(r-wm)**2,0)/(w.length-1))*Math.sqrt(252);rs.push({d:bt[k][i].date,sh:wv>0?((bt[k][i].equity/bt[k][i-252].equity-1)-0.02)/wv:0})}return{x:rs.map(r=>r.d),y:rs.map(r=>r.sh),type:'scatter',mode:'lines',name:s.name,line:{color:s.color,width:1.5,dash:s.dash}}});
+  Plotly.newPlot('chart-rolling-sharpe',rsT,{...LIGHT_LAYOUT(),yaxis:{...LIGHT_LAYOUT().yaxis,title:'12M Sharpe'}},PC);
+  
+  // === QC ===
+  $('#qc-items').innerHTML=qc.map(c=>`<div class="qc-item"><span><strong>[${c.cat}]</strong> ${c.chk}</span><span class="${c.st==='pass'?'qc-pass':c.st==='warn'?'qc-warn':'qc-fail'}">${c.st==='pass'?'✓':'⚠'} ${c.res}</span></div>`).join('');
+  $('#qc-data').innerHTML=`<div class="qc-item"><span>Stocks</span><span>${allData.meta?allData.meta.stockCount:SAMPLE_SIZE}/${SAMPLE_SIZE}</span></div><div class="qc-item"><span>Data</span><span>Adjusted Close (total return)</span></div><div class="qc-item"><span>Cache</span><span>Pre-computed (GitHub Actions)</span></div>`;
+  $('#qc-backtest').innerHTML=`<div class="qc-item"><span>Execution</span><span>Blowup T+1, Regime T+0</span></div><div class="qc-item"><span>Defensive asset</span><span>IEF</span></div><div class="qc-item"><span>Strategies</span><span>5 (Enh Blowup, Faber, Dual Mom, Composite, B&H)</span></div>`;
+  const vs2=signals.filter(s=>s.fwd.maxDD12M!=null);
+  if(vs2.length>0){const ddv=vs2.map(s=>s.fwd.maxDD12M),ddm=ddv.reduce((a,b)=>a+b,0)/ddv.length,dds=Math.sqrt(ddv.reduce((a,v)=>a+(v-ddm)**2,0)/(ddv.length-1)),ddse=dds/Math.sqrt(ddv.length);$('#qc-stats').innerHTML=`<div class="qc-item"><span>N</span><span>${signals.length}</span></div><div class="qc-item"><span>Avg fwd DD</span><span>${(ddm*100).toFixed(1)}% ± ${(ddse*100).toFixed(1)}%</span></div><div class="qc-item"><span>95% CI</span><span>[${((ddm-1.96*ddse)*100).toFixed(1)}%, ${((ddm+1.96*ddse)*100).toFixed(1)}%]</span></div>`}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════
+$$('.tab-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    $$('.tab-btn').forEach(x=>x.classList.remove('active'));
+    $$('.tab-panel').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById(b.dataset.tab).classList.add('active');
+    setTimeout(()=>window.dispatchEvent(new Event('resize')),60);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN — Read pre-computed data (no fetching!)
+// ═══════════════════════════════════════════════════════════════════
+function main(){
+  try{
+    setBar(10);setStatus('Loading pre-computed data…');
+    
+    if(typeof PRECOMPUTED_DATA==='undefined'){
+      throw new Error('No pre-computed data found. Run pipeline.py first.');
+    }
+    
+    const d=PRECOMPUTED_DATA;
+    setBar(50);setStatus('Preparing charts…');
+    
+    // Adapt data shape for render function
+    const rolling=d.rolling;
+    const signals=d.signals;
+    const bt=d.bt;
+    const m=d.metrics;
+    const qc=d.qc;
+    
+    // allData is not needed for render — only for QC stock count
+    // We pass a stub with meta info
+    const allData={meta:d.meta};
+    
+    setBar(80);setStatus('Rendering dashboard…');
+    render({rolling,signals,bt,m,qc,allData});
+    
+    setBar(100);log('✅ Dashboard loaded (pre-computed data)');
+    log(`📅 Data: ${d.meta.startDate} → ${d.meta.endDate}`);
+    log(`🔴 ${d.meta.signalCount} blowup signals`);
+    log(`🚦 Composite: ${d.meta.compositeNow}/5`);
+    
+    // Update cache status display
+    try{$('#cache-status').textContent=`Pre-computed · Updated: ${d.meta.endDate}`}catch(e){}
+    
+    setTimeout(()=>{
+      $('#loading').style.opacity='0';$('#loading').style.transition='opacity .5s';
+      setTimeout(()=>$('#loading').style.display='none',500);
+    },400);
+  }catch(err){
+    setStatus(`Error: ${err.message}`);log(`❌ ${err.stack}`);
+    $('#load-bar').style.background='#dc2626';
+  }
+}
+
+function waitAndRun(){if(typeof Plotly==='undefined'){setTimeout(waitAndRun,100);return}main()}
+waitAndRun();
+</script>
+</body>
+</html>
