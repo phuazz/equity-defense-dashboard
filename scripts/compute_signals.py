@@ -223,6 +223,75 @@ def compute_all(all_data: dict) -> dict:
     # ─── Metrics ───
     metrics = {k: calc_metrics(v) for k, v in bt.items()}
 
+    # ─── Monitor summary stats (pre-computed for dashboard) ───
+    monitor = {}
+    
+    # Score distribution: % of days at each score level
+    score_counts = [0] * 6
+    for r in rolling:
+        score_counts[r["compositeScore"]] += 1
+    total_days = len(rolling)
+    monitor["scoreDist"] = [round(c / total_days, 4) for c in score_counts]
+    
+    # Current regime duration: how many consecutive days at current score
+    curr_score = rolling[-1]["compositeScore"]
+    streak = 0
+    for i in range(len(rolling) - 1, -1, -1):
+        if rolling[i]["compositeScore"] == curr_score:
+            streak += 1
+        else:
+            break
+    monitor["regimeDays"] = streak
+    
+    # Historical average duration at each score level
+    durations = {s: [] for s in range(6)}
+    run_score, run_len = rolling[0]["compositeScore"], 1
+    for i in range(1, len(rolling)):
+        if rolling[i]["compositeScore"] == run_score:
+            run_len += 1
+        else:
+            durations[run_score].append(run_len)
+            run_score = rolling[i]["compositeScore"]
+            run_len = 1
+    durations[run_score].append(run_len)  # final run
+    monitor["avgDuration"] = [
+        round(sum(d) / len(d)) if d else 0 for d in [durations[s] for s in range(6)]
+    ]
+    
+    # Signal proximity: how far each signal is from flipping
+    last = rolling[-1]
+    prox = {}
+    # 1. Stress count: distance from 115
+    prox["stress"] = {"value": last["rolling8d"], "threshold": 115,
+                       "pct": round((last["rolling8d"] - 115) / 115, 4) if last["rolling8d"] > 0 else -1}
+    # 2. 200d MA: % distance
+    if last["sma200"]:
+        prox["sma200"] = {"value": round(last["spx"], 1), "ma": round(last["sma200"], 1),
+                          "pct": round((last["spx"] - last["sma200"]) / last["sma200"], 4)}
+    else:
+        prox["sma200"] = {"value": round(last["spx"], 1), "ma": None, "pct": None}
+    # 3. Canary
+    prox["canary"] = {"bad": last["canaryBad"], "total": last["canaryTotal"]}
+    # 4. 12M return
+    prox["mom12m"] = {"value": round(last["spy12mRet"], 4) if last["spy12mRet"] is not None else None}
+    # 5. 10M SMA
+    if last["sma10m"]:
+        prox["sma10m"] = {"value": round(last["spx"], 1), "ma": round(last["sma10m"], 1),
+                          "pct": round((last["spx"] - last["sma10m"]) / last["sma10m"], 4)}
+    else:
+        prox["sma10m"] = {"value": round(last["spx"], 1), "ma": None, "pct": None}
+    monitor["proximity"] = prox
+    
+    # Allocation history: last 2 years of composite allocation for sparkline
+    alloc_days = min(504, len(rolling))
+    alloc_hist = []
+    for i in range(len(rolling) - alloc_days, len(rolling)):
+        sc = rolling[i]["compositeScore"]
+        alloc_hist.append({"d": rolling[i]["date"], "s": sc,
+                           "spy": 100 if sc == 0 else 50 if sc == 1 else 0,
+                           "ief": 0 if sc == 0 else 50 if sc == 1 else 100})
+    monitor["allocHist"] = alloc_hist
+
     # ─── QC ───
     qc = run_qc(all_data, rolling, signals, bt, metrics)
 
@@ -248,6 +317,7 @@ def compute_all(all_data: dict) -> dict:
         "bt": bt_thin,
         "metrics": metrics,
         "qc": qc,
+        "monitor": monitor,
         "meta": {
             "startDate": rolling[0]["date"],
             "endDate": rolling[-1]["date"],
