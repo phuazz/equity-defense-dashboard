@@ -336,6 +336,104 @@ def compute_all(all_data: dict) -> dict:
             transitions.append({"date": rolling[i]["date"], "type": "exit", "spx": rolling[i]["spx"], "score": rolling[i]["compositeScore"]})
         prev_def = curr_def
     monitor["transitions"] = transitions
+
+    # Build paired defensive trades (entry → exit) with context
+    date_to_idx = {rolling[i]["date"]: i for i in range(len(rolling))}
+    trades = []
+    entries = [t for t in transitions if t["type"] == "entry"]
+    exits = [t for t in transitions if t["type"] == "exit"]
+    
+    for j, ent in enumerate(entries):
+        # Find matching exit (next exit after this entry)
+        ex = None
+        for x in exits:
+            if x["date"] > ent["date"]:
+                ex = x
+                break
+        
+        ent_idx = date_to_idx.get(ent["date"], None)
+        if ent_idx is None:
+            continue
+        
+        # Trade duration and return
+        if ex:
+            ex_idx = date_to_idx.get(ex["date"], None)
+            duration = ex_idx - ent_idx if ex_idx else None
+            spx_ret = (ex["spx"] - ent["spx"]) / ent["spx"] if ent["spx"] > 0 else 0
+            # Max DD during defensive period
+            peak = ent["spx"]
+            max_dd_def = 0
+            if ex_idx:
+                for k in range(ent_idx, ex_idx + 1):
+                    if rolling[k]["spx"] > peak:
+                        peak = rolling[k]["spx"]
+                    dd = (rolling[k]["spx"] - peak) / peak
+                    if dd < max_dd_def:
+                        max_dd_def = dd
+            # B&H return during same period (what SPX did)
+            bh_ret = spx_ret
+        else:
+            # Still in defensive — use last day as pseudo-exit
+            ex_idx = len(rolling) - 1
+            ex = {"date": rolling[-1]["date"], "spx": rolling[-1]["spx"], "score": rolling[-1]["compositeScore"]}
+            duration = ex_idx - ent_idx
+            spx_ret = (rolling[-1]["spx"] - ent["spx"]) / ent["spx"]
+            peak = ent["spx"]
+            max_dd_def = 0
+            for k in range(ent_idx, ex_idx + 1):
+                if rolling[k]["spx"] > peak:
+                    peak = rolling[k]["spx"]
+                dd = (rolling[k]["spx"] - peak) / peak
+                if dd < max_dd_def:
+                    max_dd_def = dd
+            bh_ret = spx_ret
+        
+        # VIX status at entry
+        vix_inv = rolling[ent_idx].get("vixInverted", False)
+        has_vix = rolling[ent_idx].get("hasVixData", False)
+        
+        # Context path: 63 trading days before entry to 63 after exit
+        # (3 months each side)
+        ctx_start = max(0, ent_idx - 63)
+        ctx_end = min(len(rolling) - 1, (ex_idx if ex_idx else ent_idx) + 63)
+        # Normalise to entry SPX = 100
+        entry_spx = ent["spx"]
+        ctx_path = []
+        for k in range(ctx_start, ctx_end + 1):
+            ctx_path.append({
+                "d": rolling[k]["date"],
+                "v": round(rolling[k]["spx"] / entry_spx * 100, 2),
+                "phase": "before" if k < ent_idx else ("during" if (ex_idx and k <= ex_idx) else "after")
+            })
+        
+        # Score at entry
+        entry_score = rolling[ent_idx]["compositeScore"]
+        # Peak score during defensive period
+        peak_score = entry_score
+        if ex_idx:
+            for k in range(ent_idx, min(ex_idx + 1, len(rolling))):
+                if rolling[k]["compositeScore"] > peak_score:
+                    peak_score = rolling[k]["compositeScore"]
+        
+        trade = {
+            "id": j + 1,
+            "entryDate": ent["date"],
+            "exitDate": ex["date"] if ex else None,
+            "open": ex is None or ex["date"] == rolling[-1]["date"],
+            "entrySPX": round(ent["spx"], 1),
+            "exitSPX": round(ex["spx"], 1) if ex else None,
+            "duration": duration,
+            "spxRet": round(spx_ret, 4),
+            "maxDD": round(max_dd_def, 4),
+            "entryScore": entry_score,
+            "peakScore": peak_score,
+            "vixInv": vix_inv,
+            "hasVix": has_vix,
+            "path": ctx_path,
+        }
+        trades.append(trade)
+    
+    monitor["trades"] = trades
     
     # Historical ranges for signal bars (min/max/percentiles over full history)
     stress_vals = [r["rolling8d"] for r in rolling if r["rolling8d"] is not None]
