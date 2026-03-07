@@ -191,18 +191,27 @@ def compute_all(all_data: dict) -> dict:
             rolling[i]["vixRatio"] = round(vix_val / vix3m_val, 4)
             rolling[i]["vixInverted"] = (vix_val / vix3m_val) > 1.0
             rolling[i]["hasVixData"] = True
+            rolling[i]["_vixStale"] = 0
         else:
-            # Carry forward previous day's state, but only if we've seen real data
-            if i > 0 and rolling[i - 1].get("hasVixData", False):
+            # Carry forward previous day's state, but only if:
+            # 1. We've seen real data before
+            # 2. We haven't exceeded 5 days of carry-forward (stale data cap)
+            prev_stale = rolling[i - 1].get("_vixStale", 99) if i > 0 else 99
+            if i > 0 and rolling[i - 1].get("hasVixData", False) and prev_stale < 5:
                 rolling[i]["vixRatio"] = rolling[i - 1]["vixRatio"]
                 rolling[i]["vixInverted"] = rolling[i - 1]["vixInverted"]
                 rolling[i]["hasVixData"] = True
+                rolling[i]["_vixStale"] = prev_stale + 1
             else:
-                # No real VIX data yet — signal cannot fire
+                # No real VIX data yet or stale > 5 days — signal cannot fire
                 rolling[i]["vixRatio"] = None
                 rolling[i]["vixInverted"] = False
                 rolling[i]["hasVixData"] = False
+                rolling[i]["_vixStale"] = 99
         # Composite score (6 sub-signals)
+        # Note: vixInverted uses T-1 (previous day's reading) for T+1 execution
+        # consistency with the VIX standalone strategy. All other price-based 
+        # signals are effectively T+0 (monthly signals where 1-day lag is negligible).
         score = 0
         if rolling[i]["rolling8d"] >= THRESHOLD:
             score += 1
@@ -214,8 +223,10 @@ def compute_all(all_data: dict) -> dict:
             score += 1
         if rolling[i]["belowSMA10m"]:
             score += 1
-        if rolling[i]["vixInverted"]:
+        if i > 0 and rolling[i - 1].get("vixInverted", False):
             score += 1
+        elif i == 0:
+            pass  # Day 0: VIX cannot contribute
         rolling[i]["compositeScore"] = score
 
     # ─── Signal events ───
@@ -326,15 +337,18 @@ def compute_all(all_data: dict) -> dict:
     monitor["allocHist"] = alloc_hist
     
     # Composite regime transitions (entry/exit events for chart annotation)
+    # Track ANY departure from score=0 (both partial and full defensive)
     transitions = []
-    prev_def = rolling[0]["compositeScore"] >= 2
+    prev_score = rolling[0]["compositeScore"]
+    prev_active = prev_score >= 1  # Any defense active
     for i in range(1, len(rolling)):
-        curr_def = rolling[i]["compositeScore"] >= 2
-        if curr_def and not prev_def:
-            transitions.append({"date": rolling[i]["date"], "type": "entry", "spx": rolling[i]["spx"], "score": rolling[i]["compositeScore"]})
-        elif not curr_def and prev_def:
-            transitions.append({"date": rolling[i]["date"], "type": "exit", "spx": rolling[i]["spx"], "score": rolling[i]["compositeScore"]})
-        prev_def = curr_def
+        curr_score = rolling[i]["compositeScore"]
+        curr_active = curr_score >= 1
+        if curr_active and not prev_active:
+            transitions.append({"date": rolling[i]["date"], "type": "entry", "spx": rolling[i]["spx"], "score": curr_score})
+        elif not curr_active and prev_active:
+            transitions.append({"date": rolling[i]["date"], "type": "exit", "spx": rolling[i]["spx"], "score": curr_score})
+        prev_active = curr_active
     monitor["transitions"] = transitions
 
     # Build paired defensive trades (entry → exit) with context
@@ -344,82 +358,95 @@ def compute_all(all_data: dict) -> dict:
     exits = [t for t in transitions if t["type"] == "exit"]
     
     for j, ent in enumerate(entries):
-        # Find matching exit (next exit after this entry)
+        # Find matching exit (next exit after this entry) — pointer-based
         ex = None
-        for x in exits:
-            if x["date"] > ent["date"]:
-                ex = x
-                break
+        while exits and exits[0]["date"] <= ent["date"]:
+            exits.pop(0)
+        if exits:
+            ex = exits.pop(0)
         
         ent_idx = date_to_idx.get(ent["date"], None)
         if ent_idx is None:
             continue
         
-        # Trade duration and return
+        # Determine exit index
         if ex:
             ex_idx = date_to_idx.get(ex["date"], None)
-            duration = ex_idx - ent_idx if ex_idx else None
-            spx_ret = (ex["spx"] - ent["spx"]) / ent["spx"] if ent["spx"] > 0 else 0
-            # Max DD during defensive period
-            peak = ent["spx"]
-            max_dd_def = 0
-            if ex_idx:
-                for k in range(ent_idx, ex_idx + 1):
-                    if rolling[k]["spx"] > peak:
-                        peak = rolling[k]["spx"]
-                    dd = (rolling[k]["spx"] - peak) / peak
-                    if dd < max_dd_def:
-                        max_dd_def = dd
-            # B&H return during same period (what SPX did)
-            bh_ret = spx_ret
+            is_open = False
         else:
-            # Still in defensive — use last day as pseudo-exit
+            # Still active — use last day as pseudo-exit
             ex_idx = len(rolling) - 1
             ex = {"date": rolling[-1]["date"], "spx": rolling[-1]["spx"], "score": rolling[-1]["compositeScore"]}
-            duration = ex_idx - ent_idx
-            spx_ret = (rolling[-1]["spx"] - ent["spx"]) / ent["spx"]
-            peak = ent["spx"]
-            max_dd_def = 0
-            for k in range(ent_idx, ex_idx + 1):
-                if rolling[k]["spx"] > peak:
-                    peak = rolling[k]["spx"]
-                dd = (rolling[k]["spx"] - peak) / peak
-                if dd < max_dd_def:
-                    max_dd_def = dd
-            bh_ret = spx_ret
+            is_open = True
+        
+        if ex_idx is None:
+            continue
+            
+        duration = ex_idx - ent_idx
+        spx_ret = (ex["spx"] - ent["spx"]) / ent["spx"] if ent["spx"] > 0 else 0
+        
+        # Max DD during defensive period
+        peak = ent["spx"]
+        max_dd_def = 0
+        for k in range(ent_idx, ex_idx + 1):
+            if rolling[k]["spx"] > peak:
+                peak = rolling[k]["spx"]
+            dd = (rolling[k]["spx"] - peak) / peak
+            if dd < max_dd_def:
+                max_dd_def = dd
         
         # VIX status at entry
         vix_inv = rolling[ent_idx].get("vixInverted", False)
         has_vix = rolling[ent_idx].get("hasVixData", False)
         
-        # Context path: 63 trading days before entry to 63 after exit
-        # (3 months each side)
-        ctx_start = max(0, ent_idx - 63)
-        ctx_end = min(len(rolling) - 1, (ex_idx if ex_idx else ent_idx) + 63)
-        # Normalise to entry SPX = 100
-        entry_spx = ent["spx"]
-        ctx_path = []
-        for k in range(ctx_start, ctx_end + 1):
-            ctx_path.append({
-                "d": rolling[k]["date"],
-                "v": round(rolling[k]["spx"] / entry_spx * 100, 2),
-                "phase": "before" if k < ent_idx else ("during" if (ex_idx and k <= ex_idx) else "after")
-            })
-        
         # Score at entry
         entry_score = rolling[ent_idx]["compositeScore"]
         # Peak score during defensive period
         peak_score = entry_score
-        if ex_idx:
-            for k in range(ent_idx, min(ex_idx + 1, len(rolling))):
-                if rolling[k]["compositeScore"] > peak_score:
-                    peak_score = rolling[k]["compositeScore"]
+        # Days at each level
+        days_partial = 0  # score == 1
+        days_full = 0     # score >= 2
+        for k in range(ent_idx, min(ex_idx + 1, len(rolling))):
+            sc = rolling[k]["compositeScore"]
+            if sc >= 2:
+                days_full += 1
+            elif sc == 1:
+                days_partial += 1
+            if sc > peak_score:
+                peak_score = sc
+        
+        # Trade type: "partial" if never reached score ≥2, "full" if it did, "escalated" if started partial then went full
+        if days_full == 0:
+            trade_type = "partial"
+        elif entry_score >= 2:
+            trade_type = "full"
+        else:
+            trade_type = "escalated"
+        
+        # Allocation: weighted average IEF% during the trade
+        alloc_ief_pct = round((days_full * 100 + days_partial * 50) / max(duration, 1), 1)
+        
+        # Context path: 63 trading days before entry to 63 after exit (3 months each side)
+        # Thinned to every 2nd point to reduce JSON size, but always include entry/exit days
+        ctx_start = max(0, ent_idx - 63)
+        ctx_end = min(len(rolling) - 1, ex_idx + 63)
+        entry_spx = ent["spx"]
+        ctx_path = []
+        for k in range(ctx_start, ctx_end + 1):
+            # Always include: first, last, entry day, exit day, and every 2nd point
+            is_key = (k == ctx_start or k == ctx_end or k == ent_idx or k == ex_idx)
+            if is_key or (k - ctx_start) % 2 == 0:
+                ctx_path.append({
+                    "d": rolling[k]["date"],
+                    "v": round(rolling[k]["spx"] / entry_spx * 100, 2),
+                    "phase": "before" if k < ent_idx else ("during" if k <= ex_idx else "after")
+                })
         
         trade = {
             "id": j + 1,
             "entryDate": ent["date"],
-            "exitDate": ex["date"] if ex else None,
-            "open": ex is None or ex["date"] == rolling[-1]["date"],
+            "exitDate": ex["date"] if not is_open else None,
+            "open": is_open,
             "entrySPX": round(ent["spx"], 1),
             "exitSPX": round(ex["spx"], 1) if ex else None,
             "duration": duration,
@@ -427,6 +454,10 @@ def compute_all(all_data: dict) -> dict:
             "maxDD": round(max_dd_def, 4),
             "entryScore": entry_score,
             "peakScore": peak_score,
+            "daysPartial": days_partial,
+            "daysFull": days_full,
+            "tradeType": trade_type,
+            "allocIEF": alloc_ief_pct,
             "vixInv": vix_inv,
             "hasVix": has_vix,
             "path": ctx_path,
@@ -669,7 +700,7 @@ def run_qc(all_data, rolling, signals, bt, m):
     def chk(cat, desc, result, status):
         checks.append({"cat": cat, "chk": desc, "res": result, "st": status})
 
-    stock_count = len([t for t in all_data if t not in ["SPY"] + EXTRA_TICKERS])
+    stock_count = len([t for t in all_data if t not in ["SPY"] + EXTRA_TICKERS and not t.startswith("^")])
     chk("Data", f"Stock sample size", f"{stock_count}/{SAMPLE_SIZE}", "pass" if stock_count >= SAMPLE_SIZE * 0.8 else "warn")
     chk("Data", "SPY history", f"{len(all_data.get('SPY', {}).get('dates', []))} days", "pass" if len(all_data.get("SPY", {}).get("dates", [])) > 5000 else "warn")
     chk("Data", "Data type", "Adjusted Close (total return)", "pass")
@@ -687,7 +718,7 @@ def run_qc(all_data, rolling, signals, bt, m):
     chk("Backtest", "Composite max DD", f"{m['comp']['maxDD'] * 100:.1f}% vs B&H {m['bh']['maxDD'] * 100:.1f}%", "pass" if m["comp"]["maxDD"] > m["bh"]["maxDD"] else "warn")
     chk("Backtest", "Composite def fraction", f"{m['comp']['defFrac'] * 100:.1f}%", "pass" if 0.1 < m["comp"]["defFrac"] < 0.6 else "warn")
     chk("Backtest", "Transaction costs", f"{TX_COST_BPS}bps per allocation change", "pass")
-    chk("Backtest", "Look-ahead bias", "Blowup T+1, regime T+0, no future data", "pass")
+    chk("Backtest", "Look-ahead bias", "Blowup T+1, VIX T+1, regime T+0, no future data", "pass")
 
     vs = [s for s in signals if s["fwd"]["maxDD12M"] is not None]
     if vs:
