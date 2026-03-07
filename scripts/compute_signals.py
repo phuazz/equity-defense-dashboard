@@ -26,7 +26,7 @@ SP500_SAMPLE = [
     "DIS","CMCSA","NFLX","T","VZ","CHTR",
     "SPY",
 ]
-EXTRA_TICKERS = ["VWO", "BND", "IEF", "TLT", "SHY"]
+EXTRA_TICKERS = ["VWO", "BND", "IEF", "TLT", "SHY", "^VIX", "^VIX3M"]
 ALL_TICKERS = list(set(SP500_SAMPLE + EXTRA_TICKERS))
 SAMPLE_SIZE = len([t for t in SP500_SAMPLE if t != "SPY"])
 SCALE_FACTOR = 500 / SAMPLE_SIZE
@@ -62,6 +62,15 @@ def compute_all(all_data: dict) -> dict:
     for c in ["VWO", "BND"]:
         if c in all_data:
             canary_maps[c] = dict(zip(all_data[c]["dates"], all_data[c]["adjCloses"]))
+
+    # VIX term structure maps
+    vix_map = {}
+    vix3m_map = {}
+    if "^VIX" in all_data and "^VIX3M" in all_data:
+        vix_map = dict(zip(all_data["^VIX"]["dates"], all_data["^VIX"]["adjCloses"]))
+        vix3m_map = dict(zip(all_data["^VIX3M"]["dates"], all_data["^VIX3M"]["adjCloses"]))
+    else:
+        log.warning("VIX or VIX3M data missing — vixInverted will default to False")
 
     # ─── Daily blowup count ───
     daily = []
@@ -174,7 +183,21 @@ def compute_all(all_data: dict) -> dict:
         rolling[i]["spy12mNeg"] = (
             rolling[i]["spy12mRet"] is not None and rolling[i]["spy12mRet"] < 0
         )
-        # Composite score
+        # VIX term structure
+        dt = rolling[i]["date"]
+        vix_val = vix_map.get(dt)
+        vix3m_val = vix3m_map.get(dt)
+        if vix_val is not None and vix3m_val is not None and vix3m_val > 0:
+            rolling[i]["vixRatio"] = round(vix_val / vix3m_val, 4)
+            rolling[i]["vixInverted"] = (vix_val / vix3m_val) > 1.0
+        else:
+            if i > 0:
+                rolling[i]["vixRatio"] = rolling[i - 1].get("vixRatio", 0.8)
+                rolling[i]["vixInverted"] = rolling[i - 1].get("vixInverted", False)
+            else:
+                rolling[i]["vixRatio"] = 0.8
+                rolling[i]["vixInverted"] = False
+        # Composite score (6 sub-signals)
         score = 0
         if rolling[i]["rolling8d"] >= THRESHOLD:
             score += 1
@@ -185,6 +208,8 @@ def compute_all(all_data: dict) -> dict:
         if rolling[i]["spy12mNeg"]:
             score += 1
         if rolling[i]["belowSMA10m"]:
+            score += 1
+        if rolling[i]["vixInverted"]:
             score += 1
         rolling[i]["compositeScore"] = score
 
@@ -227,7 +252,7 @@ def compute_all(all_data: dict) -> dict:
     monitor = {}
     
     # Score distribution: % of days at each score level
-    score_counts = [0] * 6
+    score_counts = [0] * 7
     for r in rolling:
         score_counts[r["compositeScore"]] += 1
     total_days = len(rolling)
@@ -244,7 +269,7 @@ def compute_all(all_data: dict) -> dict:
     monitor["regimeDays"] = streak
     
     # Historical average duration at each score level
-    durations = {s: [] for s in range(6)}
+    durations = {s: [] for s in range(7)}
     run_score, run_len = rolling[0]["compositeScore"], 1
     for i in range(1, len(rolling)):
         if rolling[i]["compositeScore"] == run_score:
@@ -255,7 +280,7 @@ def compute_all(all_data: dict) -> dict:
             run_len = 1
     durations[run_score].append(run_len)  # final run
     monitor["avgDuration"] = [
-        round(sum(d) / len(d)) if d else 0 for d in [durations[s] for s in range(6)]
+        round(sum(d) / len(d)) if d else 0 for d in [durations[s] for s in range(7)]
     ]
     
     # Signal proximity: how far each signal is from flipping
@@ -280,6 +305,9 @@ def compute_all(all_data: dict) -> dict:
                           "pct": round((last["spx"] - last["sma10m"]) / last["sma10m"], 4)}
     else:
         prox["sma10m"] = {"value": round(last["spx"], 1), "ma": None, "pct": None}
+    # 6. VIX term structure
+    prox["vixTerm"] = {"ratio": last.get("vixRatio", None),
+                        "inverted": last.get("vixInverted", False)}
     monitor["proximity"] = prox
     
     # Allocation history: last 2 years of composite allocation for sparkline
@@ -353,6 +381,8 @@ def compute_all(all_data: dict) -> dict:
             "stockCount": len(stock_tickers),
             "provider": "computed",
             "compositeNow": rolling[-1]["compositeScore"],
+            "vixRatioNow": rolling[-1].get("vixRatio", None),
+            "vixInvertedNow": rolling[-1].get("vixInverted", False),
         },
     }
 
@@ -534,6 +564,10 @@ def run_qc(all_data, rolling, signals, bt, m):
     chk("Data", "Data type", "Adjusted Close (total return)", "pass")
 
     for t in ["VWO", "BND", "IEF"]:
+        has = t in all_data and len(all_data[t].get("dates", [])) > 100
+        chk("Data", f"{t} available", "Yes" if has else "Missing", "pass" if has else "warn")
+
+    for t in ["^VIX", "^VIX3M"]:
         has = t in all_data and len(all_data[t].get("dates", [])) > 100
         chk("Data", f"{t} available", "Yes" if has else "Missing", "pass" if has else "warn")
 

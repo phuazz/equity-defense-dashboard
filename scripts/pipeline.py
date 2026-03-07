@@ -63,7 +63,8 @@ def main():
     result.pop("rollingFull", None)
 
     log.info(f"  Signals: {result['meta']['signalCount']}")
-    log.info(f"  Composite now: {result['meta']['compositeNow']}/5")
+    log.info(f"  Composite now: {result['meta']['compositeNow']}/6")
+    log.info(f"  VIX ratio: {result['meta'].get('vixRatioNow', 'N/A')}")
     log.info(f"  Period: {result['meta']['startDate']} → {result['meta']['endDate']}")
 
     # 3. Write data JSON (for debugging / external consumers)
@@ -103,7 +104,7 @@ def main():
 
     cs = result["meta"]["compositeNow"]
     label = "HIGH RISK" if cs >= 3 else "ELEVATED" if cs >= 2 else "CAUTION" if cs == 1 else "ALL CLEAR"
-    log.info(f"\n🚦 CURRENT SIGNAL: {cs}/5 → {label}")
+    log.info(f"\n🚦 CURRENT SIGNAL: {cs}/6 → {label}")
     log.info("=" * 60)
 
 
