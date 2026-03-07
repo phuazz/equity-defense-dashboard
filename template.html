@@ -107,7 +107,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div class="sec" style="font-size:14px">Current Allocation</div>
 <div id="mon-alloc"></div>
 <div class="ch"><div class="ch-t">S&P 500 — Last 12 Months</div><div id="ch-spx-recent" style="height:200px"></div></div>
-<div class="sec" style="font-size:14px">5 Risk Signals</div>
+<div class="sec" style="font-size:14px">6 Risk Signals</div>
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
@@ -118,7 +118,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div class="pnl" id="t-ov"><div class="g g4" id="ov-cards"></div><div class="ch"><div class="ch-t">S&P 500 Total Return + Stress Events</div><div id="ch-eq" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">Drawdown — All Strategies</div><div id="ch-dd" style="height:220px"></div></div><div class="ch"><div class="ch-t">8-Day Stress Count</div><div id="ch-bu" style="height:220px"></div></div></div><div class="ch"><div class="ch-t">Equity Curves (Log)</div><div id="ch-st" style="height:300px"></div></div></div>
 <div class="pnl" id="t-cmp"><div class="sec">Strategy Comparison</div><div class="tbl" id="cmp-tbl"></div><div class="ch"><div class="ch-t">Annual Returns</div><div id="ch-ann" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">DD: Composite vs B&H</div><div id="ch-ddc" style="height:220px"></div></div><div class="ch"><div class="ch-t">Defensive Allocation %</div><div id="ch-alloc" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-sig"><div class="sec">Forward Returns After Stress Events</div><div class="box">What happens after a stress signal fires? <strong id="sig-n">—</strong> historical events analyzed across 1–12 month horizons.</div><div id="sig-cards" class="sa"></div><div class="sec" style="font-size:14px">Per-Event Returns</div><div class="tbl" id="sig-tbl"></div><div class="ch"><div class="ch-t">Forward Paths (12M)</div><div id="ch-fwd" style="height:260px"></div></div><div class="box" id="sig-interp"></div><div class="g g2"><div class="ch"><div class="ch-t">Max DD Distribution</div><div id="ch-fdd" style="height:220px"></div></div><div class="ch"><div class="ch-t">Distance from ATH at Signal</div><div id="ch-ath" style="height:220px"></div></div></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="sig-stats"></div></div>
-<div class="pnl" id="t-str"><div class="sec">5 Defensive Strategies</div><div class="sbox"><h3>S1: Enhanced Stress Signal</h3><p><strong>Entry:</strong> 8D count ≥115 OR (SPX &lt; 200d AND canary bad) → IEF. <strong>Exit:</strong> SPX &gt; 200d + canary clear + 63d cooldown.</p></div><div class="sbox"><h3>S2: Faber 10-Month SMA</h3><p>Monthly. SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007).</p></div><div class="sbox"><h3>S3: Dual Momentum (Antonacci)</h3><p>Monthly. SPY 12M &gt; IEF 12M AND &gt; 0 → SPY, else → IEF.</p></div><div class="sbox"><h3>S4: Composite (≥2 of 5)</h3><p>Score 5 sub-signals. ≥2 → 100% IEF. =1 → 50/50.</p></div><div class="sbox"><h3>S5: Buy &amp; Hold</h3><p>100% SPY. Benchmark.</p></div></div>
+<div class="pnl" id="t-str"><div class="sec">6 Defensive Strategies</div><div class="sbox"><h3>S1: Enhanced Stress Signal</h3><p><strong>Entry:</strong> 8D count ≥115 OR (SPX &lt; 200d AND canary bad) → IEF. <strong>Exit:</strong> SPX &gt; 200d + canary clear + 63d cooldown.</p></div><div class="sbox"><h3>S2: Faber 10-Month SMA</h3><p>Monthly. SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007).</p></div><div class="sbox"><h3>S3: Dual Momentum (Antonacci)</h3><p>Monthly. SPY 12M &gt; IEF 12M AND &gt; 0 → SPY, else → IEF.</p></div><div class="sbox"><h3>S4: Composite (≥2 of 6)</h3><p>Score 6 sub-signals: (1) Blowup ≥115, (2) SPX &lt; 200d MA, (3) Canary bad, (4) SPY 12M &lt; 0, (5) SPX &lt; 10M SMA, (6) VIX/VIX3M &gt; 1.0. ≥2 → 100% IEF. =1 → 50/50.</p></div><div class="sbox"><h3>S5: Buy &amp; Hold</h3><p>100% SPY. Benchmark.</p></div></div>
 <div class="pnl" id="t-ev"><div class="sec">Stress Event Log</div><div class="tbl" style="max-height:75vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Date</th><th>8D</th><th>SPX</th><th>ATH</th><th>Can</th><th>MA</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody id="ev-body"></tbody></table></div></div>
 <div class="pnl" id="t-rsk"><div class="sec">Risk-Adjusted Metrics</div><div class="g g4" id="rsk-cards"></div><div class="g g2"><div class="ch"><div class="ch-t">Monthly Returns — Composite</div><div id="ch-mdist" style="height:220px"></div></div><div class="ch"><div class="ch-t">Rolling 12M Sharpe</div><div id="ch-rshp" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-qc"><div class="sec">Quality Control</div><div class="qc"><h3>Validation</h3><div id="qc-chk"></div></div><div class="sec" style="font-size:14px">Data</div><div class="cd" id="qc-data"></div><div class="sec" style="font-size:14px">Backtest</div><div class="cd" id="qc-bt"></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="qc-st"></div></div>
@@ -141,11 +141,11 @@ const{rolling:R,signals:SIG,bt:BT,m:MET,qc:QC,allData:AD,monitor:MOND}=D;
 const last=R[R.length-1];
 const STR=[{k:'enh',n:'Enhanced',c:'#dc2626'},{k:'fab',n:'Faber',c:'#7c3aed',d:'dot'},{k:'dm',n:'DualMom',c:'#b45309',d:'dashdot'},{k:'comp',n:'Composite',c:'#15803d'},{k:'bh',n:'B&H',c:'#8e95a5'}];
 $('#hd-period').textContent=R[0].date+' → '+last.date;
-$('#hd-updated').textContent=SIG.length+' stress events · Score '+last.compositeScore+'/5';
+$('#hd-updated').textContent=SIG.length+' stress events · Score '+last.compositeScore+'/6';
 
 // MONITOR - SVG Gauge
 var MON=MOND||{};
-var ba=last.rolling8d>=115,b2=last.sma200!=null&&last.spx<last.sma200,cb=last.canaryBad>=1,sn=last.spy12mNeg,b10=last.belowSMA10m;
+var ba=last.rolling8d>=115,b2=last.sma200!=null&&last.spx<last.sma200,cb=last.canaryBad>=1,sn=last.spy12mNeg,b10=last.belowSMA10m,vxI=last.vixInverted||false;
 var cs=last.compositeScore,rc=cs>=3?'r-d':cs>=1?'r-w':'r-s';
 var rl=cs>=3?'HIGH RISK':cs>=2?'ELEVATED':cs===1?'CAUTION':'ALL CLEAR';
 var ra=cs>=2?'Full Defensive — 100% IEF':cs===1?'Partial — 50% IEF / 50% SPY':'Fully Invested — 100% SPY';
@@ -156,18 +156,18 @@ var startA=Math.PI,endA=0;
 function arcPt(a,r){return{x:cx+r*Math.cos(a),y:cy-r*Math.sin(a)}}
 function arcPath(s,e,r){var p1=arcPt(s,r),p2=arcPt(e,r);var lg=(s-e)>Math.PI?1:0;return 'M'+p1.x+','+p1.y+' A'+r+','+r+' 0 '+lg+' 1 '+p2.x+','+p2.y}
 // Background arc segments with colors
-var segColors=['#15803d','#65a30d','#b45309','#dc2626','#b91c1c','#7f1d1d'];
+var segColors=['#15803d','#65a30d','#b45309','#dc2626','#b91c1c','#7f1d1d','#450a0a'];
 var segs='';
-for(var i=0;i<6;i++){var sa=Math.PI-i*(Math.PI/6);var ea=Math.PI-(i+1)*(Math.PI/6);segs+='<path d="'+arcPath(sa,ea,gr)+'" fill="none" stroke="'+segColors[i]+'" stroke-width="'+gth+'" opacity="0.2"/>';segs+='<text x="'+arcPt(sa-Math.PI/12,gr+14).x+'" y="'+arcPt(sa-Math.PI/12,gr+14).y+'" text-anchor="middle" font-size="9" fill="#8e95a5" font-family="IBM Plex Mono">'+i+'</text>'}
+for(var i=0;i<7;i++){var sa=Math.PI-i*(Math.PI/7);var ea=Math.PI-(i+1)*(Math.PI/7);segs+='<path d="'+arcPath(sa,ea,gr)+'" fill="none" stroke="'+segColors[i]+'" stroke-width="'+gth+'" opacity="0.2"/>';segs+='<text x="'+arcPt(sa-Math.PI/14,gr+14).x+'" y="'+arcPt(sa-Math.PI/14,gr+14).y+'" text-anchor="middle" font-size="9" fill="#8e95a5" font-family="IBM Plex Mono">'+i+'</text>'}
 // Active arc up to current score
-var needleA=Math.PI-cs*(Math.PI/6);
-if(cs>0){var actEnd=Math.PI-cs*(Math.PI/6);segs+='<path d="'+arcPath(Math.PI,actEnd,gr)+'" fill="none" stroke="'+scol+'" stroke-width="'+gth+'" stroke-linecap="round"/>';}
+var needleA=Math.PI-cs*(Math.PI/7);
+if(cs>0){var actEnd=Math.PI-cs*(Math.PI/7);segs+='<path d="'+arcPath(Math.PI,actEnd,gr)+'" fill="none" stroke="'+scol+'" stroke-width="'+gth+'" stroke-linecap="round"/>';}
 // Needle
 var np=arcPt(needleA,gr-30);
 segs+='<line x1="'+cx+'" y1="'+cy+'" x2="'+np.x+'" y2="'+np.y+'" stroke="'+scol+'" stroke-width="3" stroke-linecap="round"/>';
 segs+='<circle cx="'+cx+'" cy="'+cy+'" r="6" fill="'+scol+'"/>';
 segs+='<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="white"/>';
-var svg='<svg viewBox="0 0 '+gw+' '+(gh+30)+'" style="max-width:320px;width:100%;display:block;margin:0 auto">'+segs+'<text x="'+cx+'" y="'+(cy+2)+'" text-anchor="middle" font-size="28" font-weight="700" font-family="IBM Plex Mono" fill="'+scol+'" dy="-15">'+cs+'/5</text><text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="1" fill="'+scol+'">'+rl+'</text><text x="'+cx+'" y="'+(cy+34)+'" text-anchor="middle" font-size="11" fill="#555b6e"><tspan font-weight="700">'+last.date+'</tspan> — '+ra+'</text></svg>';
+var svg='<svg viewBox="0 0 '+gw+' '+(gh+30)+'" style="max-width:320px;width:100%;display:block;margin:0 auto">'+segs+'<text x="'+cx+'" y="'+(cy+2)+'" text-anchor="middle" font-size="28" font-weight="700" font-family="IBM Plex Mono" fill="'+scol+'" dy="-15">'+cs+'/6</text><text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="1" fill="'+scol+'">'+rl+'</text><text x="'+cx+'" y="'+(cy+34)+'" text-anchor="middle" font-size="11" fill="#555b6e"><tspan font-weight="700">'+last.date+'</tspan> — '+ra+'</text></svg>';
 $('#regime-hero').innerHTML='<div class="regime '+rc+'" style="padding:16px 8px 8px">'+svg+'</div>';
 
 // Allocation bar
@@ -230,24 +230,31 @@ var ma10dot=Math.min(Math.max((ma10ratio-0.85)/(1.15-0.85)*100,0),100);
 var ma10thPct=(1.0-0.85)/(1.15-0.85)*100;
 var ma10col=b10?'#dc2626':Math.abs(ma10pct)<0.03?'#b45309':'#15803d';
 sigHtml+=rangeBar('10-Month SMA (Faber)','Monthly timing — below triggers defensive allocation',fmt(last.spx,0)+' vs '+fmt(ma10v.ma,0)+' ('+(ma10pct>0?'+':'')+(ma10pct*100).toFixed(1)+'%)',ma10dot,ma10thPct,'linear-gradient(90deg, #dc2626 0%, #b45309 40%, #65a30d 50%, #15803d 70%, #15803d 100%)',b10?'⚠ BELOW 10M SMA — Faber defensive':Math.abs(ma10pct)<0.03?'⚠ Only '+(ma10pct*100).toFixed(1)+'% above — watch closely':(ma10pct*100).toFixed(1)+'% above SMA',ma10col);
+
+// 6. VIX Term Structure
+var vxR=last.vixRatio!=null?last.vixRatio:0.8;
+var vxDot=Math.min(Math.max((vxR-0.7)/(1.3-0.7)*100,0),100);
+var vxThPct=(1.0-0.7)/(1.3-0.7)*100;
+var vxCol=vxI?'#dc2626':vxR>0.95?'#b45309':'#15803d';
+sigHtml+=rangeBar('VIX Term Structure','VIX/VIX3M ratio — above 1.0 = backwardation = near-term stress',vxR.toFixed(3)+' (threshold: 1.000)',vxDot,vxThPct,'linear-gradient(90deg, #15803d 0%, #65a30d 30%, #b45309 50%, #dc2626 60%, #7f1d1d 100%)',vxI?'⚠ INVERTED — near-term stress elevated':vxR>0.95?'⚠ Ratio '+vxR.toFixed(3)+' — approaching inversion':'Contango — normal term structure',vxCol);
 $('#mon-sig').innerHTML=sigHtml;
 
 // Regime context
 var rd=MON.regimeDays||0;
 var ad=MON.avgDuration||[0,0,0,0,0,0];
 var sd=MON.scoreDist||[0,0,0,0,0,0];
-$('#mon-context').innerHTML='<div class="qi"><span>Current regime</span><span class="mono"><strong>Score '+cs+'</strong> for <strong>'+rd+'</strong> days</span></div><div class="qi"><span>Avg duration at score '+cs+'</span><span class="mono">'+ad[cs]+' days</span></div><div class="qi"><span>% of history at score 0 (all clear)</span><span class="mono">'+(sd[0]*100).toFixed(1)+'%</span></div><div class="qi"><span>% of history at score ≥2 (defensive)</span><span class="mono">'+((sd[2]+sd[3]+sd[4]+sd[5])*100).toFixed(1)+'%</span></div>';
+$('#mon-context').innerHTML='<div class="qi"><span>Current regime</span><span class="mono"><strong>Score '+cs+'</strong> for <strong>'+rd+'</strong> days</span></div><div class="qi"><span>Avg duration at score '+cs+'</span><span class="mono">'+ad[cs]+' days</span></div><div class="qi"><span>% of history at score 0 (all clear)</span><span class="mono">'+(sd[0]*100).toFixed(1)+'%</span></div><div class="qi"><span>% of history at score ≥2 (defensive)</span><span class="mono">'+((sd[2]+(sd[3]||0)+(sd[4]||0)+(sd[5]||0)+(sd[6]||0))*100).toFixed(1)+'%</span></div>';
 
 // Score distribution chart
-var sdLabels=['0\nClear','1\nWatch','2\nElev','3\nHigh','4','5\nMax'];
-var sdColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626'];
+var sdLabels=['0\nClear','1\nWatch','2\nElev','3\nHigh','4','5','6\nMax'];
+var sdColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626','#7f1d1d'];
 Plotly.newPlot('ch-sdist',[{x:sdLabels,y:sd.map(function(v){return v*100}),type:'bar',marker:{color:sdColors},text:sd.map(function(v){return (v*100).toFixed(1)+'%'}),textposition:'outside',textfont:{size:M?9:11}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{title:'% of days'}),margin:Object.assign({},PL().margin,{b:M?40:50})}),PC);
 
 // Allocation history (2Y sparkline)
 var ah=MON.allocHist||[];
 if(ah.length>0){Plotly.newPlot('ch-ahist',[{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.spy}),type:'scatter',fill:'tozeroy',name:'SPY%',line:{color:'#2563eb',width:0},fillcolor:'rgba(37,99,235,.25)'},{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.ief}),type:'scatter',name:'IEF%',line:{color:'#15803d',width:1},fillcolor:'rgba(22,163,74,.1)'}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,105]})}),PC)}
 
-Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,5.3]})}),PC);
+Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]})}),PC);
 
 // OVERVIEW
 $('#ov-cards').innerHTML=[{t:'B&H CAGR',v:pct(MET.bh.cagr),c:'pos'},{t:'Comp CAGR',v:pct(MET.comp.cagr),c:MET.comp.cagr>0?'pos':'neg'},{t:'B&H Max DD',v:pct(MET.bh.maxDD),c:'neg'},{t:'Comp Max DD',v:pct(MET.comp.maxDD),c:'neg'}].map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v '+c.c+'">'+c.v+'</div></div>'}).join('');
@@ -298,7 +305,7 @@ Plotly.newPlot('ch-rshp',rr,PL(),PC);
 // QC
 $('#qc-chk').innerHTML=QC.map(function(c){return '<div class="qi"><span><strong>['+c.cat+']</strong> '+c.chk+'</span><span style="color:'+(c.st==='pass'?'var(--grn)':c.st==='warn'?'var(--amb)':'var(--red)')+'">'+(c.st==='pass'?'✓':'⚠')+' '+c.res+'</span></div>'}).join('');
 $('#qc-data').innerHTML=[['Stocks',(AD.meta?AD.meta.stockCount:90)+'/90'],['Data','Adj Close (total return)'],['Pipeline','GitHub Actions (daily)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
-$('#qc-bt').innerHTML=[['Execution','Stress T+1, Regime T+0'],['Defensive','IEF (7-10Y UST)'],['Tx Costs','5bps per allocation change'],['Strategies','5 (Enh, Faber, DM, Comp, B&H)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
+$('#qc-bt').innerHTML=[['Execution','Stress T+1, Regime T+0'],['Defensive','IEF (7-10Y UST)'],['Tx Costs','5bps per allocation change'],['Strategies','5 (Enh, Faber, DM, Comp, B&H)'],['Composite','6 sub-signals (incl. VIX term str.)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
 var vs2=SIG.filter(function(s){return s.fwd&&s.fwd.maxDD12M!=null});
 if(vs2.length>0){var dv2=vs2.map(function(s){return s.fwd.maxDD12M}),dm2=dv2.reduce(function(a,b){return a+b},0)/dv2.length,ds2=Math.sqrt(dv2.reduce(function(a,v){return a+(v-dm2)*(v-dm2)},0)/(dv2.length-1)),de2=ds2/Math.sqrt(dv2.length);$('#qc-st').innerHTML=[['N',SIG.length],['Avg fwd DD',(dm2*100).toFixed(1)+'% ±'+(de2*100).toFixed(1)+'%'],['95% CI','['+((dm2-1.96*de2)*100).toFixed(1)+'%, '+((dm2+1.96*de2)*100).toFixed(1)+'%]']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('')}
 }
