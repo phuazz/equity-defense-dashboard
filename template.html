@@ -119,7 +119,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div class="pnl" id="t-cmp"><div class="sec">Strategy Comparison</div><div class="tbl" id="cmp-tbl"></div><div class="ch"><div class="ch-t">Annual Returns</div><div id="ch-ann" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">DD: Composite vs B&H</div><div id="ch-ddc" style="height:220px"></div></div><div class="ch"><div class="ch-t">Defensive Allocation %</div><div id="ch-alloc" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-sig"><div class="sec">Forward Returns After Stress Events</div><div class="box">What happens after a stress signal fires? <strong id="sig-n">—</strong> historical events analyzed across 1–12 month horizons.</div><div id="sig-cards" class="sa"></div><div class="sec" style="font-size:14px">Per-Event Returns</div><div class="tbl" id="sig-tbl"></div><div class="ch"><div class="ch-t">Forward Paths (12M)</div><div id="ch-fwd" style="height:260px"></div></div><div class="box" id="sig-interp"></div><div class="g g2"><div class="ch"><div class="ch-t">Max DD Distribution</div><div id="ch-fdd" style="height:220px"></div></div><div class="ch"><div class="ch-t">Distance from ATH at Signal</div><div id="ch-ath" style="height:220px"></div></div></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="sig-stats"></div></div>
 <div class="pnl" id="t-str"><div class="sec">6 Defensive Strategies</div><div class="sbox"><h3>S1: Enhanced Stress Signal</h3><p><strong>Entry:</strong> 8D count ≥115 OR (SPX &lt; 200d AND canary bad) → IEF. <strong>Exit:</strong> SPX &gt; 200d + canary clear + 63d cooldown.</p></div><div class="sbox"><h3>S2: Faber 10-Month SMA</h3><p>Monthly. SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007).</p></div><div class="sbox"><h3>S3: Dual Momentum (Antonacci)</h3><p>Monthly. SPY 12M &gt; IEF 12M AND &gt; 0 → SPY, else → IEF.</p></div><div class="sbox"><h3>S4: VIX Term Structure</h3><p>Daily. VIX/VIX3M &gt; 1.0 (backwardation) → IEF, else → SPY. Source: CBOE term structure.</p></div><div class="sbox"><h3>S5: Composite (≥2 of 6)</h3><p>Score 6 sub-signals: (1) Blowup ≥115, (2) SPX &lt; 200d MA, (3) Canary bad, (4) SPY 12M &lt; 0, (5) SPX &lt; 10M SMA, (6) VIX/VIX3M &gt; 1.0. ≥2 → 100% IEF. =1 → 50/50.</p></div><div class="sbox"><h3>S6: Buy &amp; Hold</h3><p>100% SPY. Benchmark.</p></div></div>
-<div class="pnl" id="t-ev"><div class="sec">Stress Event Log</div><div class="tbl" style="max-height:75vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Date</th><th>8D</th><th>SPX</th><th>ATH</th><th>Can</th><th>MA</th><th>VIX</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody id="ev-body"></tbody></table></div></div>
+<div class="pnl" id="t-ev"><div class="sec">Defensive Trade Log</div><div class="box">Composite regime transitions — entry when score ≥2, exit when score &lt;2. Click a row to see the SPX context chart (3M before entry → 3M after exit).</div><div class="tbl" style="max-height:50vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Entry</th><th>Exit</th><th>Days</th><th>Score</th><th>VIX</th><th>SPX In</th><th>SPX Out</th><th>SPX Δ</th><th>Max DD</th></tr></thead><tbody id="ev-body"></tbody></table></div><div class="ch" id="ev-ch-wrap" style="display:none"><div class="ch-t" id="ev-ch-title">—</div><div id="ch-ev-ctx" style="height:280px"></div></div><div class="sec" style="font-size:14px;margin-top:16px">Stress Events (Blowup Signals)</div><div class="tbl" style="max-height:40vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Date</th><th>8D</th><th>SPX</th><th>ATH</th><th>Can</th><th>MA</th><th>VIX</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody id="ev-body2"></tbody></table></div></div>
 <div class="pnl" id="t-rsk"><div class="sec">Risk-Adjusted Metrics</div><div class="g g4" id="rsk-cards"></div><div class="g g2"><div class="ch"><div class="ch-t">Monthly Returns — Composite</div><div id="ch-mdist" style="height:220px"></div></div><div class="ch"><div class="ch-t">Rolling 12M Sharpe</div><div id="ch-rshp" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-qc"><div class="sec">Quality Control</div><div class="qc"><h3>Validation</h3><div id="qc-chk"></div></div><div class="sec" style="font-size:14px">Data</div><div class="cd" id="qc-data"></div><div class="sec" style="font-size:14px">Backtest</div><div class="cd" id="qc-bt"></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="qc-st"></div></div>
 
@@ -294,8 +294,49 @@ var dv=vs.map(function(s){return s.fwd.maxDD12M}),dm=dv.reduce(function(a,b){ret
 $('#sig-stats').innerHTML=[['N',vs.length],['Mean DD',(dm*100).toFixed(1)+'%'],['SE','±'+(de*100).toFixed(1)+'%'],['95% CI','['+((dm-1.96*de)*100).toFixed(1)+'%, '+((dm+1.96*de)*100).toFixed(1)+'%]'],['12M Win',pct(wr('fwd12M'))],['Median 12M',pct(med('fwd12M'))]].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('');
 }
 
-// EVENTS
-$('#ev-body').innerHTML=SIG.map(function(s,i){var c=function(v){return v==null?'':v>0?'pos':'neg'};var vxCell=s.hasVixData==null||s.hasVixData===false?'<span class="bg bg-b">—</span>':(s.vixInverted?'<span class="bg bg-r">INV</span>':'<span class="bg bg-g">✓</span>');return '<tr><td>'+(i+1)+'</td><td class="mono">'+s.date+'</td><td><span class="bg bg-r">'+s.rolling8d+'</span></td><td class="mono">'+fmt(s.spx,0)+'</td><td><span class="bg '+(s.athDist>-.05?'bg-r':'bg-b')+'">'+pct(s.athDist,0)+'</span></td><td>'+(s.canaryBad>0?'<span class="bg bg-w">!</span>':'<span class="bg bg-g">✓</span>')+'</td><td>'+(s.aboveSMA200?'<span class="bg bg-g">↑</span>':'<span class="bg bg-r">↓</span>')+'</td><td>'+vxCell+'</td><td class="'+c(s.fwd.fwd1M)+'">'+pct(s.fwd.fwd1M)+'</td><td class="'+c(s.fwd.fwd3M)+'">'+pct(s.fwd.fwd3M)+'</td><td class="'+c(s.fwd.fwd6M)+'">'+pct(s.fwd.fwd6M)+'</td><td class="'+c(s.fwd.fwd12M)+'">'+pct(s.fwd.fwd12M)+'</td><td class="neg">'+pct(s.fwd.maxDD12M)+'</td></tr>'}).join('');
+// EVENTS — Defensive Trade Log
+var TRADES=MON.trades||[];
+$('#ev-body').innerHTML=TRADES.map(function(t){
+  var vxCell=!t.hasVix?'<span class="bg bg-b">—</span>':(t.vixInv?'<span class="bg bg-r">INV</span>':'<span class="bg bg-g">✓</span>');
+  var retCls=t.spxRet>=0?'pos':'neg';
+  return '<tr class="ev-row" data-id="'+t.id+'" style="cursor:pointer"><td>'+t.id+'</td><td class="mono">'+t.entryDate+'</td><td class="mono">'+(t.open?'<span class="bg bg-w">OPEN</span>':t.exitDate)+'</td><td>'+t.duration+'d</td><td><span class="bg bg-r">'+t.entryScore+'</span>→<span class="bg '+(t.peakScore>=3?'bg-r':'bg-w')+'">'+t.peakScore+'</span></td><td>'+vxCell+'</td><td class="mono">'+fmt(t.entrySPX,0)+'</td><td class="mono">'+(t.exitSPX?fmt(t.exitSPX,0):'—')+'</td><td class="'+retCls+'">'+pct(t.spxRet)+'</td><td class="neg">'+pct(t.maxDD)+'</td></tr>'
+}).join('');
+
+// Click handler for trade context chart
+$$('.ev-row').forEach(function(row){
+  row.addEventListener('click',function(){
+    var tid=parseInt(row.dataset.id);
+    var trade=TRADES.find(function(t){return t.id===tid});
+    if(!trade||!trade.path||trade.path.length===0)return;
+    $('#ev-ch-wrap').style.display='block';
+    $('#ev-ch-title').textContent='Trade #'+tid+': '+trade.entryDate+' → '+(trade.open?'OPEN':trade.exitDate)+' (SPX indexed to 100 at entry)';
+    var before=trade.path.filter(function(p){return p.phase==='before'});
+    var during=trade.path.filter(function(p){return p.phase==='during'});
+    var after=trade.path.filter(function(p){return p.phase==='after'});
+    var traces=[
+      {x:before.map(function(p){return p.d}),y:before.map(function(p){return p.v}),type:'scatter',mode:'lines',name:'Before',line:{color:'#8e95a5',width:lw}},
+      {x:during.map(function(p){return p.d}),y:during.map(function(p){return p.v}),type:'scatter',mode:'lines',name:'Defensive',line:{color:'#dc2626',width:lw+1},fill:'tozeroy',fillcolor:'rgba(220,38,38,.04)'},
+      {x:after.map(function(p){return p.d}),y:after.map(function(p){return p.v}),type:'scatter',mode:'lines',name:'After',line:{color:'#15803d',width:lw}}
+    ];
+    // Entry/exit markers
+    if(during.length>0){
+      traces.push({x:[during[0].d],y:[during[0].v],type:'scatter',mode:'markers',name:'Entry',marker:{color:'#dc2626',size:10,symbol:'diamond',line:{color:'#fff',width:1.5}}});
+      if(!trade.open){traces.push({x:[during[during.length-1].d],y:[during[during.length-1].v],type:'scatter',mode:'markers',name:'Exit',marker:{color:'#15803d',size:10,symbol:'diamond',line:{color:'#fff',width:1.5}}})}
+    }
+    // 100 baseline
+    var allDates=trade.path.map(function(p){return p.d});
+    traces.push({x:[allDates[0],allDates[allDates.length-1]],y:[100,100],type:'scatter',mode:'lines',name:'Entry=100',line:{color:'#b45309',width:1,dash:'dot'}});
+    Plotly.newPlot('ch-ev-ctx',traces,Object.assign({},PL(),{showlegend:!M}),PC);
+    // Highlight selected row
+    $$('.ev-row').forEach(function(r){r.style.background=''});
+    row.style.background='var(--blu-bg)';
+    // Scroll chart into view
+    document.getElementById('ev-ch-wrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+});
+
+// Stress Events (original blowup signals) — moved to secondary table
+$('#ev-body2').innerHTML=SIG.map(function(s,i){var c=function(v){return v==null?'':v>0?'pos':'neg'};var vxCell=s.hasVixData==null||s.hasVixData===false?'<span class="bg bg-b">—</span>':(s.vixInverted?'<span class="bg bg-r">INV</span>':'<span class="bg bg-g">✓</span>');return '<tr><td>'+(i+1)+'</td><td class="mono">'+s.date+'</td><td><span class="bg bg-r">'+s.rolling8d+'</span></td><td class="mono">'+fmt(s.spx,0)+'</td><td><span class="bg '+(s.athDist>-.05?'bg-r':'bg-b')+'">'+pct(s.athDist,0)+'</span></td><td>'+(s.canaryBad>0?'<span class="bg bg-w">!</span>':'<span class="bg bg-g">✓</span>')+'</td><td>'+(s.aboveSMA200?'<span class="bg bg-g">↑</span>':'<span class="bg bg-r">↓</span>')+'</td><td>'+vxCell+'</td><td class="'+c(s.fwd.fwd1M)+'">'+pct(s.fwd.fwd1M)+'</td><td class="'+c(s.fwd.fwd3M)+'">'+pct(s.fwd.fwd3M)+'</td><td class="'+c(s.fwd.fwd6M)+'">'+pct(s.fwd.fwd6M)+'</td><td class="'+c(s.fwd.fwd12M)+'">'+pct(s.fwd.fwd12M)+'</td><td class="neg">'+pct(s.fwd.maxDD12M)+'</td></tr>'}).join('');
 
 // RISK
 $('#rsk-cards').innerHTML=STR.map(function(s){return{t:s.n+' Sharpe',v:MET[s.k].sharpe.toFixed(2)}}).concat([{t:'Comp Sortino',v:MET.comp.sortino.toFixed(2)},{t:'Comp Calmar',v:MET.comp.calmar.toFixed(2)},{t:'Comp Vol',v:pct(MET.comp.vol)}]).map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v">'+c.v+'</div></div>'}).join('');
