@@ -189,25 +189,38 @@ def compute_all(all_data: dict) -> dict:
         vix3m_val = vix3m_map.get(dt)
         if vix_val is not None and vix3m_val is not None and vix3m_val > 0:
             rolling[i]["vixRatio"] = round(vix_val / vix3m_val, 4)
-            rolling[i]["vixInverted"] = (vix_val / vix3m_val) > 1.0
+            rolling[i]["vixRaw"] = (vix_val / vix3m_val) > 1.0  # Raw daily reading
             rolling[i]["hasVixData"] = True
             rolling[i]["_vixStale"] = 0
         else:
-            # Carry forward previous day's state, but only if:
-            # 1. We've seen real data before
-            # 2. We haven't exceeded 5 days of carry-forward (stale data cap)
+            # Carry forward previous day's state with 5-day stale cap
             prev_stale = rolling[i - 1].get("_vixStale", 99) if i > 0 else 99
             if i > 0 and rolling[i - 1].get("hasVixData", False) and prev_stale < 5:
                 rolling[i]["vixRatio"] = rolling[i - 1]["vixRatio"]
-                rolling[i]["vixInverted"] = rolling[i - 1]["vixInverted"]
+                rolling[i]["vixRaw"] = rolling[i - 1]["vixRaw"]
                 rolling[i]["hasVixData"] = True
                 rolling[i]["_vixStale"] = prev_stale + 1
             else:
-                # No real VIX data yet or stale > 5 days — signal cannot fire
                 rolling[i]["vixRatio"] = None
-                rolling[i]["vixInverted"] = False
+                rolling[i]["vixRaw"] = False
                 rolling[i]["hasVixData"] = False
                 rolling[i]["_vixStale"] = 99
+        # 3-day confirmation: vixInverted only fires after 3 consecutive days
+        # of raw inversion. Only count days with real data (stale=0) or fresh
+        # carry-forward (stale ≤ 1, i.e. weekend gap). Don't count prolonged stale.
+        if i >= 2:
+            confirmed = True
+            for k in range(3):
+                r_k = rolling[i - k]
+                if not r_k.get("vixRaw", False):
+                    confirmed = False
+                    break
+                if r_k.get("_vixStale", 0) > 1:
+                    confirmed = False
+                    break
+            rolling[i]["vixInverted"] = confirmed
+        else:
+            rolling[i]["vixInverted"] = False
         # Composite score (6 sub-signals)
         # Note: vixInverted uses T-1 (previous day's reading) for T+1 execution
         # consistency with the VIX standalone strategy. All other price-based 
@@ -383,6 +396,8 @@ def compute_all(all_data: dict) -> dict:
             continue
             
         duration = ex_idx - ent_idx
+        if duration <= 0:
+            continue  # Skip zero/negative duration trades (data anomaly)
         spx_ret = (ex["spx"] - ent["spx"]) / ent["spx"] if ent["spx"] > 0 else 0
         
         # Max DD during defensive period
@@ -517,6 +532,11 @@ def compute_all(all_data: dict) -> dict:
             "compositeNow": rolling[-1]["compositeScore"],
             "vixRatioNow": rolling[-1].get("vixRatio", None),
             "vixInvertedNow": rolling[-1].get("vixInverted", False),
+            # Next-day score: what composite will be tomorrow using today's confirmed VIX
+            # Swap yesterday's vixInverted (used in today's score) for today's vixInverted
+            "nextDayScore": rolling[-1]["compositeScore"]
+                - (1 if (len(rolling) >= 2 and rolling[-2].get("vixInverted", False)) else 0)
+                + (1 if rolling[-1].get("vixInverted", False) else 0),
         },
     }
 
@@ -600,7 +620,8 @@ def run_backtests(rolling, signals):
         d = 1.0 if (spy12 is not None and ief12 is not None and (spy12 < 0 or spy12 < ief12)) else 0.0
         return (d, "defensive" if d else "invested")
 
-    # S4: VIX Term Structure (T+1 execution: use previous day's inversion status)
+    # S4: VIX Term Structure (T+1 execution: use previous day's confirmed inversion)
+    # Note: vixInverted already requires 3 consecutive days of raw inversion
     def vix_fn(i, r):
         if i == 0:
             return (0.0, "invested")
@@ -718,7 +739,16 @@ def run_qc(all_data, rolling, signals, bt, m):
     chk("Backtest", "Composite max DD", f"{m['comp']['maxDD'] * 100:.1f}% vs B&H {m['bh']['maxDD'] * 100:.1f}%", "pass" if m["comp"]["maxDD"] > m["bh"]["maxDD"] else "warn")
     chk("Backtest", "Composite def fraction", f"{m['comp']['defFrac'] * 100:.1f}%", "pass" if 0.1 < m["comp"]["defFrac"] < 0.6 else "warn")
     chk("Backtest", "Transaction costs", f"{TX_COST_BPS}bps per allocation change", "pass")
-    chk("Backtest", "Look-ahead bias", "Blowup T+1, VIX T+1, regime T+0, no future data", "pass")
+    chk("Backtest", "Look-ahead bias", "Blowup T+1, VIX T+1 (3d confirm), regime T+0, no future data", "pass")
+
+    # VIX strategy sanity checks
+    vix_def = m["vix"]["defFrac"]
+    chk("Backtest", "VIX def fraction", f"{vix_def * 100:.1f}%", "pass" if 0.05 < vix_def < 0.40 else "warn")
+    # VIX turnover: count allocation flips in backtest
+    vix_flips = sum(1 for j in range(1, len(bt["vix"])) if bt["vix"][j]["mode"] != bt["vix"][j-1]["mode"])
+    vix_yrs = len(bt["vix"]) / 252
+    vix_annual_flips = round(vix_flips / vix_yrs, 1) if vix_yrs > 0 else 0
+    chk("Backtest", "VIX annual round-trips", f"{vix_annual_flips}", "pass" if vix_annual_flips < 10 else "warn")
 
     vs = [s for s in signals if s["fwd"]["maxDD12M"] is not None]
     if vs:
