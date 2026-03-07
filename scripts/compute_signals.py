@@ -47,7 +47,7 @@ def compute_all(all_data: dict) -> dict:
     spy_adj = dict(zip(spy["dates"], spy["adjCloses"]))
 
     # Stock price maps
-    stock_tickers = [t for t in all_data if t not in ["SPY"] + EXTRA_TICKERS]
+    stock_tickers = [t for t in all_data if t not in ["SPY"] + EXTRA_TICKERS and not t.startswith("^")]
     stock_maps = {}
     for t in stock_tickers:
         stock_maps[t] = dict(zip(all_data[t]["dates"], all_data[t]["adjCloses"]))
@@ -190,13 +190,18 @@ def compute_all(all_data: dict) -> dict:
         if vix_val is not None and vix3m_val is not None and vix3m_val > 0:
             rolling[i]["vixRatio"] = round(vix_val / vix3m_val, 4)
             rolling[i]["vixInverted"] = (vix_val / vix3m_val) > 1.0
+            rolling[i]["hasVixData"] = True
         else:
-            if i > 0:
-                rolling[i]["vixRatio"] = rolling[i - 1].get("vixRatio", 0.8)
-                rolling[i]["vixInverted"] = rolling[i - 1].get("vixInverted", False)
+            # Carry forward previous day's state, but only if we've seen real data
+            if i > 0 and rolling[i - 1].get("hasVixData", False):
+                rolling[i]["vixRatio"] = rolling[i - 1]["vixRatio"]
+                rolling[i]["vixInverted"] = rolling[i - 1]["vixInverted"]
+                rolling[i]["hasVixData"] = True
             else:
-                rolling[i]["vixRatio"] = 0.8
+                # No real VIX data yet — signal cannot fire
+                rolling[i]["vixRatio"] = None
                 rolling[i]["vixInverted"] = False
+                rolling[i]["hasVixData"] = False
         # Composite score (6 sub-signals)
         score = 0
         if rolling[i]["rolling8d"] >= THRESHOLD:
@@ -466,7 +471,14 @@ def run_backtests(rolling, signals):
         d = 1.0 if (spy12 is not None and ief12 is not None and (spy12 < 0 or spy12 < ief12)) else 0.0
         return (d, "defensive" if d else "invested")
 
-    # S4: Composite
+    # S4: VIX Term Structure (T+1 execution: use previous day's inversion status)
+    def vix_fn(i, r):
+        if i == 0:
+            return (0.0, "invested")
+        d = 1.0 if r[i - 1].get("vixInverted", False) else 0.0
+        return (d, "defensive" if d else "invested")
+
+    # S5: Composite
     def comp_fn(i, r):
         sc = r[i]["compositeScore"]
         if sc >= 2:
@@ -484,6 +496,7 @@ def run_backtests(rolling, signals):
         "enh": _bt_loop(rolling, enh_fn),
         "fab": _bt_loop(rolling, fab_fn),
         "dm": _bt_loop(rolling, dm_fn),
+        "vix": _bt_loop(rolling, vix_fn),
         "comp": _bt_loop(rolling, comp_fn),
     }
 

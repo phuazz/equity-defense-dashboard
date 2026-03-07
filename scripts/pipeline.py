@@ -101,6 +101,7 @@ def main():
     log.info(f"Enh Blowup:CAGR {m['enh']['cagr']*100:.1f}% | MaxDD {m['enh']['maxDD']*100:.1f}% | Sharpe {m['enh']['sharpe']}")
     log.info(f"Faber 10M: CAGR {m['fab']['cagr']*100:.1f}% | MaxDD {m['fab']['maxDD']*100:.1f}% | Sharpe {m['fab']['sharpe']}")
     log.info(f"Dual Mom:  CAGR {m['dm']['cagr']*100:.1f}% | MaxDD {m['dm']['maxDD']*100:.1f}% | Sharpe {m['dm']['sharpe']}")
+    log.info(f"VIX Term:  CAGR {m['vix']['cagr']*100:.1f}% | MaxDD {m['vix']['maxDD']*100:.1f}% | Sharpe {m['vix']['sharpe']}")
 
     cs = result["meta"]["compositeNow"]
     label = "HIGH RISK" if cs >= 3 else "ELEVATED" if cs >= 2 else "CAUTION" if cs == 1 else "ALL CLEAR"
