@@ -97,7 +97,8 @@ def main():
     log.info("=" * 60)
     m = result["metrics"]
     log.info(f"B&H:       CAGR {m['bh']['cagr']*100:.1f}% | MaxDD {m['bh']['maxDD']*100:.1f}% | Sharpe {m['bh']['sharpe']}")
-    log.info(f"Composite: CAGR {m['comp']['cagr']*100:.1f}% | MaxDD {m['comp']['maxDD']*100:.1f}% | Sharpe {m['comp']['sharpe']}")
+    log.info(f"Comp(IEF): CAGR {m['comp']['cagr']*100:.1f}% | MaxDD {m['comp']['maxDD']*100:.1f}% | Sharpe {m['comp']['sharpe']}")
+    log.info(f"Comp(SHY): CAGR {m['compShy']['cagr']*100:.1f}% | MaxDD {m['compShy']['maxDD']*100:.1f}% | Sharpe {m['compShy']['sharpe']}")
     log.info(f"Enh Blowup:CAGR {m['enh']['cagr']*100:.1f}% | MaxDD {m['enh']['maxDD']*100:.1f}% | Sharpe {m['enh']['sharpe']}")
     log.info(f"Faber 10M: CAGR {m['fab']['cagr']*100:.1f}% | MaxDD {m['fab']['maxDD']*100:.1f}% | Sharpe {m['fab']['sharpe']}")
     log.info(f"Dual Mom:  CAGR {m['dm']['cagr']*100:.1f}% | MaxDD {m['dm']['maxDD']*100:.1f}% | Sharpe {m['dm']['sharpe']}")

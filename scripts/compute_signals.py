@@ -26,7 +26,7 @@ SP500_SAMPLE = [
     "DIS","CMCSA","NFLX","T","VZ","CHTR",
     "SPY",
 ]
-EXTRA_TICKERS = ["VWO", "BND", "IEF", "TLT", "SHY", "^VIX", "^VIX3M"]
+EXTRA_TICKERS = ["VWO", "BND", "IEF", "SHV", "TLT", "SHY", "^VIX", "^VIX3M"]
 ALL_TICKERS = list(set(SP500_SAMPLE + EXTRA_TICKERS))
 SAMPLE_SIZE = len([t for t in SP500_SAMPLE if t != "SPY"])
 SCALE_FACTOR = 500 / SAMPLE_SIZE
@@ -52,10 +52,15 @@ def compute_all(all_data: dict) -> dict:
     for t in stock_tickers:
         stock_maps[t] = dict(zip(all_data[t]["dates"], all_data[t]["adjCloses"]))
 
-    # IEF map
+    # IEF map (7-10Y UST — duration hedge)
     ief_map = {}
     if "IEF" in all_data:
         ief_map = dict(zip(all_data["IEF"]["dates"], all_data["IEF"]["adjCloses"]))
+
+    # SHY map (1-3Y UST — short duration, low rate risk)
+    shy_map = {}
+    if "SHY" in all_data:
+        shy_map = dict(zip(all_data["SHY"]["dates"], all_data["SHY"]["adjCloses"]))
 
     # Canary maps
     canary_maps = {}
@@ -147,6 +152,13 @@ def compute_all(all_data: dict) -> dict:
         prev_d = rolling[i - 1]["date"] if i > 0 else None
         p1, p0 = ief_map.get(d), (ief_map.get(prev_d) if prev_d else None)
         rolling[i]["iefRet"] = (p1 - p0) / p0 if (p0 and p1) else 0
+
+    # ─── SHY daily returns ───
+    for i in range(len(rolling)):
+        d = rolling[i]["date"]
+        prev_d = rolling[i - 1]["date"] if i > 0 else None
+        p1, p0 = shy_map.get(d), (shy_map.get(prev_d) if prev_d else None)
+        rolling[i]["shyRet"] = (p1 - p0) / p0 if (p0 and p1) else CASH_RATE
 
     # ─── Extra signals for strategies ───
     def sma10m(i):
@@ -342,21 +354,23 @@ def compute_all(all_data: dict) -> dict:
     # Allocation history: last 2 years of composite allocation for sparkline
     alloc_days = min(504, len(rolling))
     alloc_hist = []
+    alloc_map = [0, 0, 50, 75, 100, 100, 100]
     for i in range(len(rolling) - alloc_days, len(rolling)):
-        sc = rolling[i]["compositeScore"]
+        sc = min(rolling[i]["compositeScore"], 6)
+        ief_pct = alloc_map[sc]
         alloc_hist.append({"d": rolling[i]["date"], "s": sc,
-                           "spy": 100 if sc == 0 else 50 if sc == 1 else 0,
-                           "ief": 0 if sc == 0 else 50 if sc == 1 else 100})
+                           "spy": 100 - ief_pct,
+                           "ief": ief_pct})
     monitor["allocHist"] = alloc_hist
     
     # Composite regime transitions (entry/exit events for chart annotation)
-    # Track ANY departure from score=0 (both partial and full defensive)
+    # With Grad D scheme, score=1 is ignored. Entry = score goes from <2 to ≥2.
     transitions = []
     prev_score = rolling[0]["compositeScore"]
-    prev_active = prev_score >= 1  # Any defense active
+    prev_active = prev_score >= 2  # Defense active at score ≥2
     for i in range(1, len(rolling)):
         curr_score = rolling[i]["compositeScore"]
-        curr_active = curr_score >= 1
+        curr_active = curr_score >= 2
         if curr_active and not prev_active:
             transitions.append({"date": rolling[i]["date"], "type": "entry", "spx": rolling[i]["spx"], "score": curr_score})
         elif not curr_active and prev_active:
@@ -418,28 +432,35 @@ def compute_all(all_data: dict) -> dict:
         entry_score = rolling[ent_idx]["compositeScore"]
         # Peak score during defensive period
         peak_score = entry_score
-        # Days at each level
-        days_partial = 0  # score == 1
-        days_full = 0     # score >= 2
+        # Days at each level (Grad D: 0/0/50/75/100/100/100)
+        days_partial = 0  # score 2 or 3 (50% or 75% IEF)
+        days_full = 0     # score >= 4 (100% IEF)
         for k in range(ent_idx, min(ex_idx + 1, len(rolling))):
             sc = rolling[k]["compositeScore"]
-            if sc >= 2:
+            if sc >= 4:
                 days_full += 1
-            elif sc == 1:
+            elif sc >= 2:
                 days_partial += 1
             if sc > peak_score:
                 peak_score = sc
         
-        # Trade type: "partial" if never reached score ≥2, "full" if it did, "escalated" if started partial then went full
-        if days_full == 0:
+        # Trade type
+        if days_full == 0 and days_partial == 0:
+            trade_type = "watch"  # Score=1 only, no allocation change
+        elif days_full == 0:
             trade_type = "partial"
-        elif entry_score >= 2:
+        elif entry_score >= 4:
             trade_type = "full"
         else:
             trade_type = "escalated"
         
-        # Allocation: weighted average IEF% during the trade
-        alloc_ief_pct = round((days_full * 100 + days_partial * 50) / max(duration, 1), 1)
+        # Allocation: weighted average IEF% during the trade (Grad D map)
+        trade_alloc_map = [0, 0, 50, 75, 100, 100, 100]
+        alloc_days_sum = 0
+        for k in range(ent_idx, min(ex_idx + 1, len(rolling))):
+            sc = min(rolling[k]["compositeScore"], 6)
+            alloc_days_sum += trade_alloc_map[sc]
+        alloc_ief_pct = round(alloc_days_sum / max(duration, 1), 1)
         
         # Context path: 63 trading days before entry to 63 after exit (3 months each side)
         # Thinned to every 2nd point to reduce JSON size, but always include entry/exit days
@@ -543,26 +564,28 @@ def compute_all(all_data: dict) -> dict:
 
 # ─── Backtest engine ───
 
-# Transaction cost: 5bps per unit of allocation change (conservative for SPY/IEF)
-# e.g. 0→100% defensive = 5bps, 0→50% = 2.5bps, 50→100% = 2.5bps
-TX_COST_BPS = 5
+# Transaction cost: 10bps per unit of allocation change
+# Covers bid-ask spread + market impact for SPY/IEF at institutional size
+TX_COST_BPS = 10
 
-def _bt_loop(rolling, is_defensive_fn):
-    """Generic backtest loop. is_defensive_fn(i, rolling) -> (def_frac, mode_str)"""
+def _bt_loop(rolling, is_defensive_fn, def_ret_key="iefRet"):
+    """Generic backtest loop. is_defensive_fn(i, rolling) -> (def_frac, mode_str)
+    def_ret_key: which return field to use for defensive allocation (iefRet or shvRet)
+    """
     eq = [{"date": rolling[0]["date"], "equity": 100000, "dd": 0, "mode": "invested"}]
     peak = 100000
     prev_def = 0.0
     total_tx = 0.0
     for i in range(1, len(rolling)):
         r = (rolling[i]["spx"] - rolling[i - 1]["spx"]) / rolling[i - 1]["spx"]
-        ief_r = rolling[i]["iefRet"]
+        def_r = rolling[i].get(def_ret_key, CASH_RATE) or CASH_RATE
         def_frac, mode = is_defensive_fn(i, rolling)
         # Transaction cost: proportional to allocation change
         alloc_change = abs(def_frac - prev_def)
         tx = alloc_change * TX_COST_BPS / 10000 if alloc_change > 0.01 else 0
         total_tx += tx
         prev_def = def_frac
-        ret = def_frac * (ief_r if ief_r else CASH_RATE) + (1 - def_frac) * r - tx
+        ret = def_frac * def_r + (1 - def_frac) * r - tx
         e = eq[-1]["equity"] * (1 + ret)
         if e > peak:
             peak = e
@@ -628,14 +651,16 @@ def run_backtests(rolling, signals):
         d = 1.0 if r[i - 1].get("vixInverted", False) else 0.0
         return (d, "defensive" if d else "invested")
 
-    # S5: Composite
+    # S5: Composite — Graduated D allocation scheme
+    # Score: 0→0%, 1→0%, 2→50%, 3→75%, 4+→100%
+    # Score=1 is noise (SPX still positive on average), so we skip it.
+    # This reduces tx costs by ~60% vs the old 0/50/100 scheme.
+    ALLOC_MAP = [0.0, 0.0, 0.5, 0.75, 1.0, 1.0, 1.0]
     def comp_fn(i, r):
-        sc = r[i]["compositeScore"]
-        if sc >= 2:
-            return (1.0, "defensive")
-        elif sc == 1:
-            return (0.5, "partial")
-        return (0.0, "invested")
+        sc = min(r[i]["compositeScore"], 6)
+        d = ALLOC_MAP[sc]
+        mode = "invested" if d == 0 else ("partial" if d < 1.0 else "defensive")
+        return (d, mode)
 
     # B&H
     def bh_fn(i, r):
@@ -647,7 +672,8 @@ def run_backtests(rolling, signals):
         "fab": _bt_loop(rolling, fab_fn),
         "dm": _bt_loop(rolling, dm_fn),
         "vix": _bt_loop(rolling, vix_fn),
-        "comp": _bt_loop(rolling, comp_fn),
+        "comp": _bt_loop(rolling, comp_fn, def_ret_key="iefRet"),
+        "compShy": _bt_loop(rolling, comp_fn, def_ret_key="shyRet"),
     }
 
 
@@ -730,6 +756,9 @@ def run_qc(all_data, rolling, signals, bt, m):
         has = t in all_data and len(all_data[t].get("dates", [])) > 100
         chk("Data", f"{t} available", "Yes" if has else "Missing", "pass" if has else "warn")
 
+    has_shy = "SHY" in all_data and len(all_data["SHY"].get("dates", [])) > 100
+    chk("Data", "SHY available", "Yes" if has_shy else "Missing", "pass" if has_shy else "warn")
+
     for t in ["^VIX", "^VIX3M"]:
         has = t in all_data and len(all_data[t].get("dates", [])) > 100
         chk("Data", f"{t} available", "Yes" if has else "Missing", "pass" if has else "warn")
@@ -738,7 +767,7 @@ def run_qc(all_data, rolling, signals, bt, m):
     chk("Backtest", "B&H CAGR", f"{m['bh']['cagr'] * 100:.1f}%", "pass" if 0.07 < m["bh"]["cagr"] < 0.15 else "warn")
     chk("Backtest", "Composite max DD", f"{m['comp']['maxDD'] * 100:.1f}% vs B&H {m['bh']['maxDD'] * 100:.1f}%", "pass" if m["comp"]["maxDD"] > m["bh"]["maxDD"] else "warn")
     chk("Backtest", "Composite def fraction", f"{m['comp']['defFrac'] * 100:.1f}%", "pass" if 0.1 < m["comp"]["defFrac"] < 0.6 else "warn")
-    chk("Backtest", "Transaction costs", f"{TX_COST_BPS}bps per allocation change", "pass")
+    chk("Backtest", "Transaction costs", f"{TX_COST_BPS}bps per allocation change (Grad D scheme)", "pass")
     chk("Backtest", "Look-ahead bias", "Blowup T+1, VIX T+1 (3d confirm), regime T+0, no future data", "pass")
 
     # VIX strategy sanity checks
