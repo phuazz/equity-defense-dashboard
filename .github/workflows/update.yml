@@ -3,7 +3,7 @@ name: Update S&P 500 Risk Overlay
 on:
   schedule:
     # Run daily at 22:00 UTC (5:00 PM ET after market close, 6:00 AM SGT+1)
-    - cron: '0 22 * * 1-5'
+    - cron: '0 1 * * *'
   workflow_dispatch:  # Manual trigger
 
 permissions:
