@@ -312,31 +312,27 @@ function heatBg(val,isDD){
 function heatFg(val,isDD){if(val==null)return '#aaa';if(isDD)return '#b91c1c';return val>0?'#15803d':'#dc2626';}
 
 // Build summary table + box plot data for a panel
-// Compute unconditional baseline: forward returns across ALL days (benchmark)
+// Compute unconditional baseline: forward returns AND MDD across ALL days (benchmark)
 var baseline={};
-saHorizons.forEach(function(h){baseline[h.k]=[]});
-baseline['MDD 12W']=[];
+saHorizons.forEach(function(h){baseline[h.k]=[];baseline['MDD_'+h.k]=[]});
 for(var ri=0;ri<R.length;ri++){
   if(ri+1>=R.length)continue;
   var p0b=R[ri+1].spx;if(!p0b)continue;
   saHorizons.forEach(function(h){
     var ei=ri+1+h.d;if(ei>=R.length)return;
     baseline[h.k].push((R[ei].spx-p0b)/p0b);
+    var pk2=p0b,md2=0;
+    for(var d2=ri+1;d2<=ei;d2++){if(R[d2].spx>pk2)pk2=R[d2].spx;var dd2=(R[d2].spx-pk2)/pk2;if(dd2<md2)md2=dd2;}
+    baseline['MDD_'+h.k].push(md2);
   });
-  var ei12=ri+1+63;if(ei12>=R.length)continue;
-  var pk2=p0b,md2=0;
-  for(var d2=ri+1;d2<=ei12;d2++){if(R[d2].spx>pk2)pk2=R[d2].spx;var dd2=(R[d2].spx-pk2)/pk2;if(dd2<md2)md2=dd2;}
-  baseline['MDD 12W'].push(md2);
 }
 var baselineStats={};
-['1W','4W','12W','MDD 12W'].forEach(function(k){
-  var arr=baseline[k];if(!arr.length)return;
+['1W','4W','12W','MDD_1W','MDD_4W','MDD_12W'].forEach(function(k){
+  var arr=baseline[k];if(!arr||!arr.length)return;
   baselineStats[k]={p25:percentile(arr,0.25),med:saMed2(arr),p75:percentile(arr,0.75)};
 });
 
 function buildPanel(episodes,chartId,noteId,direction){
-  // Removed table — chart only
-  // Collect box plot data
   var bpData=[];
   var minScore=direction==='det'?1:0,maxScore=direction==='det'?6:5;
   var activeScores=[];
@@ -348,117 +344,162 @@ function buildPanel(episodes,chartId,noteId,direction){
       var st=epStats(eps,h.d);
       if(st.rets.length>=2){
         bpData.push({score:si,horizon:h.k,type:'ret',raw:st.rets,n:eps.length,
-          p10:percentile(st.rets,0.1),p25:percentile(st.rets,0.25),
-          med:saMed2(st.rets),p75:percentile(st.rets,0.75),p90:percentile(st.rets,0.9)});
+          med:saMed2(st.rets)});
+      }
+      if(st.mdds.length>=2){
+        bpData.push({score:si,horizon:h.k,type:'mdd',raw:st.mdds,n:eps.length,
+          med:saMed2(st.mdds)});
       }
     });
-    var mddSt=epStats(eps,63);
-    if(mddSt.mdds.length>=2){
-      bpData.push({score:si,horizon:'MDD 12W',type:'mdd',raw:mddSt.mdds,n:eps.length,
-        p10:percentile(mddSt.mdds,0.1),p25:percentile(mddSt.mdds,0.25),
-        med:saMed2(mddSt.mdds),p75:percentile(mddSt.mdds,0.75),p90:percentile(mddSt.mdds,0.9)});
-    }
   }
   if(!activeScores.length)return;
 
-  var panelsAll=[{k:'1W',l:'1W Forward'},{k:'4W',l:'4W Forward'},{k:'12W',l:'12W Forward'},{k:'MDD 12W',l:'Max DD 12W'}];
-  var panels=M?[panelsAll[1],panelsAll[2],panelsAll[3]]:panelsAll;
-  var panelColors2={'1W':'rgba(99,102,241,','4W':'rgba(37,99,235,','12W':'rgba(8,145,178,','MDD 12W':'rgba(220,38,38,'};
-  var nP=panels.length;
+  // 6 panels: top row = fwd returns, bottom row = MDD, 3 columns = 1W/4W/12W
+  // On mobile: 6 panels stacked vertically (grouped: 1W ret, 1W mdd, 4W ret, 4W mdd, 12W ret, 12W mdd)
+  var horizons=['1W','4W','12W'];
+  var retColor='rgba(37,99,235,';
+  var mddColor='rgba(220,38,38,';
+  var panelList=[];
+  if(M){
+    // Mobile: stack as pairs (ret then mdd per horizon) — but 6 is too many. Show 4W+12W only = 4 panels
+    ['4W','12W'].forEach(function(h){
+      panelList.push({k:h,type:'ret',l:h+' Forward Return'});
+      panelList.push({k:h,type:'mdd',l:h+' Max Drawdown'});
+    });
+  } else {
+    // Desktop: 2 rows x 3 cols
+    horizons.forEach(function(h){panelList.push({k:h,type:'ret',l:h+' Forward Return'})});
+    horizons.forEach(function(h){panelList.push({k:h,type:'mdd',l:h+' Max Drawdown'})});
+  }
+  var nP=panelList.length;
   var yLabels=activeScores.map(function(s){return saScoreLabels[s]+' ('+episodes[s].length+')'}).reverse();
-  var rowH=M?34:42;
-  var panelH=activeScores.length*rowH+(M?50:55);
-  var chartH=M?panelH*nP+(nP-1)*16+10:panelH+35;
+  var rowH=M?32:38;
+  var panelH=activeScores.length*rowH+(M?44:48);
+
+  var nCols,nRows;
+  if(M){nCols=1;nRows=nP;}
+  else{nCols=3;nRows=2;}
+
+  var gapX=0.05,gapY=0.12;
+  var colW3=(1-gapX*(nCols-1))/nCols;
+  var rowH3=(1-gapY*(nRows-1))/nRows;
+  var chartH=M?panelH*nP+(nP-1)*12+10:panelH*nRows+(nRows-1)*40+45;
 
   var cEl=document.querySelector(chartId);
   cEl.style.height=chartH+'px';
   cEl.innerHTML='';
 
   var traces=[],annotations=[],shapes=[];
-  var gap=M?0.07:0.05;
-  var colW2,rowHFrac;
-  if(M){colW2=1;rowHFrac=(1-gap*(nP-1))/nP;}
-  else{colW2=(1-gap*(nP-1))/nP;rowHFrac=1;}
 
-  panels.forEach(function(pObj,pi){
-    var pk=pObj.k;
+  panelList.forEach(function(pObj,pi){
+    var pk=pObj.k,pt=pObj.type;
     var xAxis=pi===0?'x':'x'+(pi+1);
     var yAxis=pi===0?'y':'y'+(pi+1);
+    var isDD=pt==='mdd';
+    var baseColor=isDD?mddColor:retColor;
 
+    // Panel title
     annotations.push({text:'<b>'+pObj.l+'</b>',x:0.5,y:1.0,
       xref:xAxis+' domain',yref:yAxis+' domain',
-      showarrow:false,font:{size:M?10:11,color:'#444'},yshift:M?2:4});
+      showarrow:false,font:{size:M?10:11,color:isDD?'#991b1b':'#1e40af'},yshift:M?2:4});
 
-    // Baseline reference band (unconditional p25-p75)
-    var bs=baselineStats[pk];
+    // Baseline band
+    var bsKey=isDD?'MDD_'+pk:pk;
+    var bs=baselineStats[bsKey];
     if(bs){
       shapes.push({type:'rect',x0:bs.p25*100,x1:bs.p75*100,y0:0,y1:1,
         xref:xAxis,yref:yAxis+' domain',
-        fillcolor:pk==='MDD 12W'?'rgba(220,38,38,0.04)':'rgba(34,139,34,0.05)',line:{width:0}});
+        fillcolor:isDD?'rgba(220,38,38,0.04)':'rgba(34,139,34,0.05)',line:{width:0}});
       shapes.push({type:'line',x0:bs.med*100,x1:bs.med*100,y0:0,y1:1,
         xref:xAxis,yref:yAxis+' domain',
-        line:{color:pk==='MDD 12W'?'rgba(220,38,38,0.3)':'rgba(34,139,34,0.3)',width:1.5,dash:'dot'}});
+        line:{color:isDD?'rgba(220,38,38,0.35)':'rgba(34,139,34,0.35)',width:1.5,dash:'dot'}});
       annotations.push({x:bs.med*100,y:1,xref:xAxis,yref:yAxis+' domain',
-        text:'baseline '+(bs.med>=0?'+':'')+(bs.med*100).toFixed(1)+'%',
+        text:'avg '+(bs.med>=0?'+':'')+(bs.med*100).toFixed(1)+'%',
         showarrow:false,font:{size:M?7:8,color:'#999'},yshift:-8});
     }
 
-    // Zero line
+    // Zero line — prominent
     shapes.push({type:'line',x0:0,x1:0,y0:0,y1:1,
-      xref:xAxis,yref:yAxis+' domain',line:{color:'#ccc',width:1,dash:'dash'}});
+      xref:xAxis,yref:yAxis+' domain',
+      line:{color:'#888',width:1.5,dash:'solid'}});
 
+    // Box plots
     activeScores.slice().reverse().forEach(function(sc){
-      var pt=bpData.filter(function(d){return d.score===sc&&d.horizon===pk})[0];
-      if(!pt)return;
-      var vals=pt.raw.map(function(v){return v*100});
-      var yLabel=saScoreLabels[sc]+' ('+pt.n+')';
-      var baseColor=panelColors2[pk]||'rgba(100,100,100,';
-      var fillAlpha=pt.med>=0&&pk!=='MDD 12W'?0.35:0.25;
+      var dp=bpData.filter(function(d){return d.score===sc&&d.horizon===pk&&d.type===pt})[0];
+      if(!dp)return;
+      var vals=dp.raw.map(function(v){return v*100});
+      var yLabel=saScoreLabels[sc]+' ('+dp.n+')';
+      var fillAlpha=(!isDD&&dp.med>=0)?0.35:0.25;
+      var medV=dp.med*100;
+      var p25=percentile(dp.raw,0.25)*100;
+      var p75=percentile(dp.raw,0.75)*100;
+      var mn=Math.min.apply(null,vals);
+      var mx=Math.max.apply(null,vals);
 
       traces.push({type:'box',x:vals,y:vals.map(function(){return yLabel}),
         orientation:'h',xaxis:xAxis,yaxis:yAxis,
         name:saScoreLabels[sc],showlegend:false,boxpoints:false,
-        line:{color:baseColor+'0.75)',width:M?1:1.5},
+        line:{color:baseColor+'0.7)',width:M?1:1.5},
         fillcolor:baseColor+fillAlpha+')',
-        whiskerwidth:0.4,hoverinfo:'x',hoveron:'boxes'});
+        whiskerwidth:0.4,
+        hoveron:'boxes',
+        hovertemplate:saScoreLabels[sc]+'<br>Med: '+(medV>=0?'+':'')+medV.toFixed(1)+'%<br>IQR: '+p25.toFixed(1)+'% to '+p75.toFixed(1)+'%<br>Range: '+mn.toFixed(1)+'% to '+mx.toFixed(1)+'%<extra></extra>'
+      });
 
-      var medX=pt.med*100;
-      annotations.push({x:medX,y:yLabel,xref:xAxis,yref:yAxis,
-        text:'<b>'+(pt.med>=0?'+':'')+(medX).toFixed(1)+'%</b>',
+      // Median annotation
+      annotations.push({x:medV,y:yLabel,xref:xAxis,yref:yAxis,
+        text:'<b>'+(dp.med>=0?'+':'')+(medV).toFixed(1)+'%</b>',
         showarrow:false,
-        font:{size:M?8:9,color:pk==='MDD 12W'?'#991b1b':(pt.med>=0?'#15803d':'#b91c1c')},
+        font:{size:M?8:9,color:isDD?'#991b1b':(dp.med>=0?'#15803d':'#b91c1c')},
         yshift:M?-13:-15});
     });
   });
 
+  // Layout
   var layout={paper_bgcolor:'transparent',plot_bgcolor:'transparent',
     font:{family:'Source Sans 3',size:M?9:11,color:'#555b6e'},
     margin:{t:M?18:28,r:M?10:16,b:M?10:14,l:M?62:80},
     height:chartH,annotations:annotations,shapes:shapes,
     showlegend:false,hovermode:'closest',dragmode:false};
-  panels.forEach(function(pObj,pi){
+
+  panelList.forEach(function(pObj,pi){
     var xKey=pi===0?'xaxis':'xaxis'+(pi+1);
     var yKey=pi===0?'yaxis':'yaxis'+(pi+1);
     var xAnchor=pi===0?'y':'y'+(pi+1);
     var yAnchor=pi===0?'x':'x'+(pi+1);
     var xDomain,yDomain;
-    if(M){var rs=1-(pi+1)*rowHFrac-pi*gap;xDomain=[0,1];yDomain=[Math.max(0,rs),Math.min(1,rs+rowHFrac)];}
-    else{var cs2=pi*(colW2+gap);xDomain=[cs2,cs2+colW2];yDomain=[0,1];}
+    if(M){
+      // Stacked vertically
+      var rFrac=(1-0.05*(nP-1))/nP;
+      var rs=1-(pi+1)*rFrac-pi*0.05;
+      xDomain=[0,1];yDomain=[Math.max(0,rs),Math.min(1,rs+rFrac)];
+    } else {
+      // 2 rows x 3 cols
+      var col=pi<3?pi:pi-3;
+      var row=pi<3?0:1;
+      var xs=col*(colW3+gapX);
+      var ys=1-(row+1)*rowH3-row*gapY;
+      xDomain=[xs,xs+colW3];
+      yDomain=[Math.max(0,ys),Math.min(1,ys+rowH3)];
+    }
     layout[xKey]={domain:xDomain,gridcolor:'#eee',linecolor:'#eee',
       tickfont:{size:M?8:10,color:'#888'},zeroline:false,ticksuffix:'%',anchor:xAnchor};
     layout[yKey]={domain:yDomain,anchor:yAnchor,gridcolor:'#f5f5f5',linecolor:'transparent',
       tickfont:{size:M?8:10},automargin:true,showgrid:false,
       categoryorder:'array',categoryarray:yLabels};
-    if(!M&&pi>0){layout[yKey].showticklabels=false;}
+    // Show y labels only on leftmost column (desktop) or all (mobile)
+    if(!M&&(pi%3!==0)){layout[yKey].showticklabels=false;}
   });
+
   Plotly.newPlot(chartId.replace('#',''),traces,layout,PC);
 
   var subFs=M?'8.5px':'10px';
-  $(noteId).innerHTML='<div style="font-size:'+subFs+';color:#999;margin-top:2px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+'. Forward returns from T+1. Shaded band = unconditional p25\u2013p75; dotted line = unconditional median.</div>';
+  $(noteId).innerHTML='<div style="font-size:'+subFs+';color:#999;margin-top:2px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+'. Forward returns from T+1. Shaded band = unconditional p25\u2013p75; dotted line = unconditional median. Solid line = zero.</div>';
 }
 
 buildPanel(detEpisodes,'#sa-det-chart','#sa-det-note','det');
 buildPanel(impEpisodes,'#sa-imp-chart','#sa-imp-note','imp');
+
 
 // Allocation history (2Y sparkline)
 var ah=MON.allocHist||[];
