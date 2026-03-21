@@ -111,8 +111,8 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
-<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-det-chart" style="margin-top:4px"></div></div>
-<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-imp-chart" style="margin-top:4px"></div></div>
+<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-chart" style="margin-top:4px"></div><div id="sa-det-note" style="padding:0 4px"></div></div>
+<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-chart" style="margin-top:4px"></div><div id="sa-imp-note" style="padding:0 4px"></div></div>
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
 </div>
@@ -312,22 +312,31 @@ function heatBg(val,isDD){
 function heatFg(val,isDD){if(val==null)return '#aaa';if(isDD)return '#b91c1c';return val>0?'#15803d':'#dc2626';}
 
 // Build summary table + box plot data for a panel
-function buildPanel(episodes,targetId,chartId,direction){
-  var fs=M?'10px':'12px',subFs=M?'8.5px':'10px',cp=M?'4px 3px':'5px 6px';
-  var html='<table style="width:100%;min-width:'+(M?'420px':'0')+';border-collapse:collapse;font-size:'+fs+';line-height:1.3">';
-  html+='<thead><tr style="border-bottom:2px solid #ccc">';
-  html+='<th style="text-align:left;padding:'+cp+';font-weight:700;position:sticky;left:0;background:var(--cd,#fff);z-index:1">'+(direction==='det'?'Score ↑':'Score ↓')+'</th>';
-  html+='<th style="padding:'+cp+';text-align:center;font-weight:600">N</th>';
-  saHorizons.forEach(function(h){html+='<th style="padding:'+cp+';text-align:center;font-weight:600">'+h.k+'</th>'});
-  html+='<th style="padding:'+cp+';text-align:center;font-weight:600;border-left:2px solid #ddd">MDD 12W</th>';
-  html+='</tr>';
-  html+='<tr style="border-bottom:1px solid #e5e5e5;font-size:'+subFs+';color:#888">';
-  html+='<th style="position:sticky;left:0;background:var(--cd,#fff);z-index:1;padding:0 3px 2px"></th>';
-  html+='<th style="padding:0 3px 2px;text-align:center">episodes</th>';
-  saHorizons.forEach(function(){html+='<th style="padding:0 2px 2px;text-align:center">med · hit%</th>'});
-  html+='<th style="padding:0 2px 2px;text-align:center;border-left:2px solid #ddd">avg · p90</th>';
-  html+='</tr></thead><tbody>';
+// Compute unconditional baseline: forward returns across ALL days (benchmark)
+var baseline={};
+saHorizons.forEach(function(h){baseline[h.k]=[]});
+baseline['MDD 12W']=[];
+for(var ri=0;ri<R.length;ri++){
+  if(ri+1>=R.length)continue;
+  var p0b=R[ri+1].spx;if(!p0b)continue;
+  saHorizons.forEach(function(h){
+    var ei=ri+1+h.d;if(ei>=R.length)return;
+    baseline[h.k].push((R[ei].spx-p0b)/p0b);
+  });
+  var ei12=ri+1+63;if(ei12>=R.length)continue;
+  var pk2=p0b,md2=0;
+  for(var d2=ri+1;d2<=ei12;d2++){if(R[d2].spx>pk2)pk2=R[d2].spx;var dd2=(R[d2].spx-pk2)/pk2;if(dd2<md2)md2=dd2;}
+  baseline['MDD 12W'].push(md2);
+}
+var baselineStats={};
+['1W','4W','12W','MDD 12W'].forEach(function(k){
+  var arr=baseline[k];if(!arr.length)return;
+  baselineStats[k]={p25:percentile(arr,0.25),med:saMed2(arr),p75:percentile(arr,0.75)};
+});
 
+function buildPanel(episodes,chartId,noteId,direction){
+  // Removed table — chart only
+  // Collect box plot data
   var bpData=[];
   var minScore=direction==='det'?1:0,maxScore=direction==='det'?6:5;
   var activeScores=[];
@@ -335,214 +344,121 @@ function buildPanel(episodes,targetId,chartId,direction){
     var eps=episodes[si];
     if(!eps.length)continue;
     activeScores.push(si);
-    html+='<tr style="border-bottom:1px solid #f0f0f0">';
-    html+='<td style="padding:'+cp+';white-space:nowrap;position:sticky;left:0;background:var(--cd,#fff);z-index:1"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+saScoreColors[si]+';margin-right:3px;vertical-align:middle"></span><strong>'+saScoreLabels[si]+'</strong></td>';
-    html+='<td style="padding:'+cp+';text-align:center" class="mono">'+eps.length+'</td>';
     saHorizons.forEach(function(h){
       var st=epStats(eps,h.d);
-      var med=saMed2(st.rets),wr=saWr2(st.rets);
-      var bg=heatBg(med,false),fg=heatFg(med,false);
-      html+='<td style="padding:'+cp+';text-align:center;background:'+bg+'" class="mono">';
-      html+='<span style="color:'+fg+';font-weight:600">'+(med!=null?pct(med):'—')+'</span>';
-      if(wr!=null)html+='<br><span style="font-size:'+subFs+';color:#888">'+(wr*100).toFixed(0)+'%</span>';
-      html+='</td>';
-      if(st.rets.length>=3){
-        bpData.push({score:si,horizon:h.k,type:'ret',raw:st.rets,
+      if(st.rets.length>=2){
+        bpData.push({score:si,horizon:h.k,type:'ret',raw:st.rets,n:eps.length,
           p10:percentile(st.rets,0.1),p25:percentile(st.rets,0.25),
           med:saMed2(st.rets),p75:percentile(st.rets,0.75),p90:percentile(st.rets,0.9)});
       }
     });
     var mddSt=epStats(eps,63);
-    var avgMDD=saMean2(mddSt.mdds),p90MDD=percentile(mddSt.mdds,0.1);
-    var bgDD=heatBg(avgMDD,true);
-    html+='<td style="padding:'+cp+';text-align:center;background:'+bgDD+';border-left:2px solid #ddd" class="mono">';
-    html+='<span style="color:#b91c1c;font-weight:600">'+(avgMDD!=null?pct(avgMDD):'—')+'</span>';
-    if(p90MDD!=null)html+='<br><span style="font-size:'+subFs+';color:#999">p90 '+pct(p90MDD)+'</span>';
-    html+='</td>';
-    if(mddSt.mdds.length>=3){
-      bpData.push({score:si,horizon:'MDD 12W',type:'mdd',raw:mddSt.mdds,
+    if(mddSt.mdds.length>=2){
+      bpData.push({score:si,horizon:'MDD 12W',type:'mdd',raw:mddSt.mdds,n:eps.length,
         p10:percentile(mddSt.mdds,0.1),p25:percentile(mddSt.mdds,0.25),
         med:saMed2(mddSt.mdds),p75:percentile(mddSt.mdds,0.75),p90:percentile(mddSt.mdds,0.9)});
     }
-    html+='</tr>';
   }
-  html+='</tbody></table>';
-  html+='<div style="font-size:'+subFs+';color:#999;margin-top:4px;padding:0 3px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+' score. Forward returns from T+1. Cells: <strong>median</strong> · <em>hit%</em>.</div>';
-  $(targetId).innerHTML=html;
-
-  // === Horizontal Box Plot Grid ===
   if(!activeScores.length)return;
 
-  var panelsAll=[{k:'1W',l:'1W Fwd Return'},{k:'4W',l:'4W Fwd Return'},{k:'12W',l:'12W Fwd Return'},{k:'MDD 12W',l:'Max Drawdown 12W'}];
-  // On mobile, show only 3 key panels in a single column to avoid cramming
+  var panelsAll=[{k:'1W',l:'1W Forward'},{k:'4W',l:'4W Forward'},{k:'12W',l:'12W Forward'},{k:'MDD 12W',l:'Max DD 12W'}];
   var panels=M?[panelsAll[1],panelsAll[2],panelsAll[3]]:panelsAll;
-  var panelColors={'1W':'rgba(99,102,241,','4W':'rgba(37,99,235,','12W':'rgba(8,145,178,','MDD 12W':'rgba(220,38,38,'};
+  var panelColors2={'1W':'rgba(99,102,241,','4W':'rgba(37,99,235,','12W':'rgba(8,145,178,','MDD 12W':'rgba(220,38,38,'};
   var nP=panels.length;
-  var yLabels=activeScores.map(function(s){return saScoreLabels[s]}).reverse();
-  var rowH=M?30:40;
-  var panelH=activeScores.length*rowH+(M?50:60);
-  var chartH=M?panelH*nP+(nP-1)*20+20:panelH+40;// mobile: stacked; desktop: single row
+  var yLabels=activeScores.map(function(s){return saScoreLabels[s]+' ('+episodes[s].length+')'}).reverse();
+  var rowH=M?34:42;
+  var panelH=activeScores.length*rowH+(M?50:55);
+  var chartH=M?panelH*nP+(nP-1)*16+10:panelH+35;
 
   var cEl=document.querySelector(chartId);
   cEl.style.height=chartH+'px';
   cEl.innerHTML='';
 
-  var traces=[];
-  var annotations=[];
-  var shapes=[];
-
-  // Layout grid: desktop = nP columns x 1 row; mobile = 1 column x nP rows
-  var gap=M?0.08:0.05;
-  var colW,rowHFrac;
-  if(M){
-    colW=1;// full width
-    rowHFrac=(1-gap*(nP-1))/nP;
-  } else {
-    colW=(1-gap*(nP-1))/nP;
-    rowHFrac=1;
-  }
+  var traces=[],annotations=[],shapes=[];
+  var gap=M?0.07:0.05;
+  var colW2,rowHFrac;
+  if(M){colW2=1;rowHFrac=(1-gap*(nP-1))/nP;}
+  else{colW2=(1-gap*(nP-1))/nP;rowHFrac=1;}
 
   panels.forEach(function(pObj,pi){
     var pk=pObj.k;
     var xAxis=pi===0?'x':'x'+(pi+1);
     var yAxis=pi===0?'y':'y'+(pi+1);
 
-    // Column/panel title annotation
-    var titleXRef=xAxis+' domain';
-    var titleYRef=yAxis+' domain';
-    annotations.push({
-      text:'<b>'+pObj.l+'</b>',
-      x:M?0.5:0.5,y:1.0,
-      xref:titleXRef,yref:titleYRef,
-      showarrow:false,font:{size:M?10:11,color:'#444'},
-      yshift:M?2:4
-    });
+    annotations.push({text:'<b>'+pObj.l+'</b>',x:0.5,y:1.0,
+      xref:xAxis+' domain',yref:yAxis+' domain',
+      showarrow:false,font:{size:M?10:11,color:'#444'},yshift:M?2:4});
 
-    activeScores.slice().reverse().forEach(function(sc,yi){
+    // Baseline reference band (unconditional p25-p75)
+    var bs=baselineStats[pk];
+    if(bs){
+      shapes.push({type:'rect',x0:bs.p25*100,x1:bs.p75*100,y0:0,y1:1,
+        xref:xAxis,yref:yAxis+' domain',
+        fillcolor:pk==='MDD 12W'?'rgba(220,38,38,0.04)':'rgba(34,139,34,0.05)',line:{width:0}});
+      shapes.push({type:'line',x0:bs.med*100,x1:bs.med*100,y0:0,y1:1,
+        xref:xAxis,yref:yAxis+' domain',
+        line:{color:pk==='MDD 12W'?'rgba(220,38,38,0.3)':'rgba(34,139,34,0.3)',width:1.5,dash:'dot'}});
+      annotations.push({x:bs.med*100,y:1,xref:xAxis,yref:yAxis+' domain',
+        text:'baseline '+(bs.med>=0?'+':'')+(bs.med*100).toFixed(1)+'%',
+        showarrow:false,font:{size:M?7:8,color:'#999'},yshift:-8});
+    }
+
+    // Zero line
+    shapes.push({type:'line',x0:0,x1:0,y0:0,y1:1,
+      xref:xAxis,yref:yAxis+' domain',line:{color:'#ccc',width:1,dash:'dash'}});
+
+    activeScores.slice().reverse().forEach(function(sc){
       var pt=bpData.filter(function(d){return d.score===sc&&d.horizon===pk})[0];
       if(!pt)return;
       var vals=pt.raw.map(function(v){return v*100});
-      var baseColor=panelColors[pk]||'rgba(100,100,100,';
+      var yLabel=saScoreLabels[sc]+' ('+pt.n+')';
+      var baseColor=panelColors2[pk]||'rgba(100,100,100,';
       var fillAlpha=pt.med>=0&&pk!=='MDD 12W'?0.35:0.25;
 
-      traces.push({
-        type:'box',
-        x:vals,
-        y:vals.map(function(){return saScoreLabels[sc]}),
-        orientation:'h',
-        xaxis:xAxis,yaxis:yAxis,
-        name:saScoreLabels[sc],
-        showlegend:false,
-        boxpoints:false,
-        line:{color:baseColor+'0.8)',width:M?1:1.5},
+      traces.push({type:'box',x:vals,y:vals.map(function(){return yLabel}),
+        orientation:'h',xaxis:xAxis,yaxis:yAxis,
+        name:saScoreLabels[sc],showlegend:false,boxpoints:false,
+        line:{color:baseColor+'0.75)',width:M?1:1.5},
         fillcolor:baseColor+fillAlpha+')',
-        whiskerwidth:0.5,
-        hoverinfo:'x',
-        hoveron:'boxes'
-      });
+        whiskerwidth:0.4,hoverinfo:'x',hoveron:'boxes'});
 
-      // Median annotation below box
       var medX=pt.med*100;
-      annotations.push({
-        x:medX,y:saScoreLabels[sc],
-        xref:xAxis,yref:yAxis,
+      annotations.push({x:medX,y:yLabel,xref:xAxis,yref:yAxis,
         text:'<b>'+(pt.med>=0?'+':'')+(medX).toFixed(1)+'%</b>',
         showarrow:false,
         font:{size:M?8:9,color:pk==='MDD 12W'?'#991b1b':(pt.med>=0?'#15803d':'#b91c1c')},
-        yshift:M?-13:-15
-      });
-
-      // p10/p90 whisker labels — show on desktop always, on mobile only for extremes
-      if(!M||sc>=3||sc<=1){
-        annotations.push({
-          x:pt.p10*100,y:saScoreLabels[sc],
-          xref:xAxis,yref:yAxis,
-          text:(pt.p10*100).toFixed(0),
-          showarrow:false,
-          font:{size:M?7:8,color:'#aaa'},
-          xshift:M?-10:-12
-        });
-        annotations.push({
-          x:pt.p90*100,y:saScoreLabels[sc],
-          xref:xAxis,yref:yAxis,
-          text:(pt.p90>=0?'+':'')+(pt.p90*100).toFixed(0),
-          showarrow:false,
-          font:{size:M?7:8,color:'#aaa'},
-          xshift:M?10:12
-        });
-      }
-    });
-
-    // Zero line as a shape — use paper coordinates for y to span full subplot
-    shapes.push({
-      type:'line',
-      x0:0,x1:0,
-      y0:0,y1:1,
-      xref:xAxis,yref:yAxis+' domain',
-      line:{color:'#bbb',width:1,dash:'dash'}
+        yshift:M?-13:-15});
     });
   });
 
-  // Build layout with dynamic axis domains
-  var layout={
-    paper_bgcolor:'transparent',plot_bgcolor:'transparent',
+  var layout={paper_bgcolor:'transparent',plot_bgcolor:'transparent',
     font:{family:'Source Sans 3',size:M?9:11,color:'#555b6e'},
-    margin:{t:M?16:28,r:M?10:20,b:M?10:14,l:M?54:70},
-    height:chartH,
-    annotations:annotations,
-    shapes:shapes,
-    showlegend:false,
-    hovermode:M?'closest':'closest',
-    dragmode:false
-  };
-
+    margin:{t:M?18:28,r:M?10:16,b:M?10:14,l:M?62:80},
+    height:chartH,annotations:annotations,shapes:shapes,
+    showlegend:false,hovermode:'closest',dragmode:false};
   panels.forEach(function(pObj,pi){
     var xKey=pi===0?'xaxis':'xaxis'+(pi+1);
     var yKey=pi===0?'yaxis':'yaxis'+(pi+1);
     var xAnchor=pi===0?'y':'y'+(pi+1);
     var yAnchor=pi===0?'x':'x'+(pi+1);
     var xDomain,yDomain;
-
-    if(M){
-      // Stacked vertically: each panel takes a row
-      var rowStart=1-(pi+1)*(rowHFrac)-(pi)*gap;
-      var rowEnd=rowStart+rowHFrac;
-      xDomain=[0,1];
-      yDomain=[Math.max(0,rowStart),Math.min(1,rowEnd)];
-    } else {
-      // Side by side: each panel takes a column
-      var colStart=pi*(colW+gap);
-      var colEnd=colStart+colW;
-      xDomain=[colStart,colEnd];
-      yDomain=[0,1];
-    }
-
-    layout[xKey]={
-      domain:xDomain,
-      gridcolor:'#eee',linecolor:'#eee',
-      tickfont:{size:M?8:10,color:'#888'},
-      zeroline:false,
-      ticksuffix:'%',
-      anchor:xAnchor
-    };
-    layout[yKey]={
-      domain:yDomain,
-      anchor:yAnchor,
-      gridcolor:'#f5f5f5',linecolor:'transparent',
-      tickfont:{size:M?8:10},
-      automargin:true,
-      showgrid:false,
-      categoryorder:'array',categoryarray:yLabels
-    };
-    // On desktop, only show y labels on first panel; on mobile show on all
+    if(M){var rs=1-(pi+1)*rowHFrac-pi*gap;xDomain=[0,1];yDomain=[Math.max(0,rs),Math.min(1,rs+rowHFrac)];}
+    else{var cs2=pi*(colW2+gap);xDomain=[cs2,cs2+colW2];yDomain=[0,1];}
+    layout[xKey]={domain:xDomain,gridcolor:'#eee',linecolor:'#eee',
+      tickfont:{size:M?8:10,color:'#888'},zeroline:false,ticksuffix:'%',anchor:xAnchor};
+    layout[yKey]={domain:yDomain,anchor:yAnchor,gridcolor:'#f5f5f5',linecolor:'transparent',
+      tickfont:{size:M?8:10},automargin:true,showgrid:false,
+      categoryorder:'array',categoryarray:yLabels};
     if(!M&&pi>0){layout[yKey].showticklabels=false;}
   });
-
   Plotly.newPlot(chartId.replace('#',''),traces,layout,PC);
+
+  var subFs=M?'8.5px':'10px';
+  $(noteId).innerHTML='<div style="font-size:'+subFs+';color:#999;margin-top:2px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+'. Forward returns from T+1. Shaded band = unconditional p25\u2013p75; dotted line = unconditional median.</div>';
 }
 
-buildPanel(detEpisodes,'#sa-det-summary','#sa-det-chart','det');
-buildPanel(impEpisodes,'#sa-imp-summary','#sa-imp-chart','imp');
+buildPanel(detEpisodes,'#sa-det-chart','#sa-det-note','det');
+buildPanel(impEpisodes,'#sa-imp-chart','#sa-imp-note','imp');
 
 // Allocation history (2Y sparkline)
 var ah=MON.allocHist||[];
