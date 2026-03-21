@@ -111,7 +111,8 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
-<div class="ch"><div class="ch-t">Score Analysis — Distribution & Forward Returns</div><div id="score-analysis" style="min-height:80px;overflow-x:auto;-webkit-overflow-scrolling:touch"></div></div>
+<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-det-chart" style="height:260px;margin-top:4px"></div></div>
+<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-imp-chart" style="height:260px;margin-top:4px"></div></div>
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
 </div>
@@ -258,138 +259,206 @@ var ad=MON.avgDuration||[0,0,0,0,0,0,0];
 var sd=MON.scoreDist||[0,0,0,0,0,0,0];
 $('#mon-context').innerHTML='<div class="qi"><span>Current regime</span><span class="mono"><strong>Score '+cs+'</strong> for <strong>'+rd+'</strong> days</span></div><div class="qi"><span>Avg duration at score '+cs+'</span><span class="mono">'+ad[cs]+' days</span></div><div class="qi"><span>% of history at score 0 (all clear)</span><span class="mono">'+(sd[0]*100).toFixed(1)+'%</span></div><div class="qi"><span>% of history at score ≥2 (defensive)</span><span class="mono">'+((sd[2]+(sd[3]||0)+(sd[4]||0)+(sd[5]||0)+(sd[6]||0))*100).toFixed(1)+'%</span></div>';
 
-// Score Analysis — Heatmap table: Median Fwd Returns + Hit Rate + Drawdown Risk by Score
-// Forward returns computed from R array. IMPORTANT: T+1 (day AFTER score date, not including signal day)
-var fwdLookups=[{k:'1W',d:5,l:'1W'},{k:'4W',d:21,l:'4W'},{k:'12W',d:63,l:'12W'},{k:'26W',d:126,l:'26W'}];
-var ddLookups=[{k:'12W',d:63,l:'MDD 12W'},{k:'26W',d:126,l:'MDD 26W'}];
-var scoreStats={};
-for(var si=0;si<=6;si++){scoreStats[si]={n:0,fwd:{},dd:{}};fwdLookups.forEach(function(f){scoreStats[si].fwd[f.k]=[]});ddLookups.forEach(function(f){scoreStats[si].dd[f.k]=[]});}
-for(var ri=0;ri<R.length;ri++){
-  var sc=R[ri].compositeScore;if(sc==null)continue;
-  scoreStats[sc].n++;
-  var maxD=Math.max.apply(null,fwdLookups.concat(ddLookups).map(function(f){return f.d}));
-  if(ri+1>=R.length)continue;
-  var p0=R[ri+1].spx;// T+1 price
-  if(!p0)continue;
-  fwdLookups.forEach(function(f){
-    var endIdx=ri+1+f.d;
+// === SCORE EPISODE ANALYSIS ===
+// Two panels: (A) Deterioration = score rises to N from lower, (B) Improvement = score falls to N from higher
+// Forward returns from T+1 (day AFTER transition), non-overlapping episodes only
+
+var saHorizons=[{k:'1W',d:5},{k:'4W',d:21},{k:'12W',d:63}];
+var saScoreLabels=['0 Clear','1 Watch','2 Elev','3 High','4','5','6 Max'];
+var saScoreColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626','#7f1d1d'];
+
+// Collect episodes
+var detEpisodes={},impEpisodes={};// keyed by target score
+for(var s=0;s<=6;s++){detEpisodes[s]=[];impEpisodes[s]=[];}
+for(var ri=1;ri<R.length;ri++){
+  var cur=R[ri].compositeScore,prev=R[ri-1].compositeScore;
+  if(cur==null||prev==null)continue;
+  if(cur>prev)detEpisodes[cur].push(ri);// deterioration: score rose
+  if(cur<prev)impEpisodes[cur].push(ri);// improvement: score fell
+}
+
+// Compute forward stats for a set of episodes
+function epStats(indices,horizon){
+  var rets=[],mdds=[];
+  indices.forEach(function(ri){
+    if(ri+1>=R.length)return;
+    var p0=R[ri+1].spx;// T+1
+    if(!p0)return;
+    var endIdx=ri+1+horizon;
     if(endIdx>=R.length)return;
-    scoreStats[sc].fwd[f.k].push((R[endIdx].spx-p0)/p0);
-  });
-  ddLookups.forEach(function(f){
-    var endIdx=ri+1+f.d;
-    if(endIdx>=R.length)return;
+    rets.push((R[endIdx].spx-p0)/p0);
     var peak=p0,mdd=0;
     for(var di=ri+1;di<=endIdx;di++){
       if(R[di].spx>peak)peak=R[di].spx;
       var dd=(R[di].spx-peak)/peak;
       if(dd<mdd)mdd=dd;
     }
-    scoreStats[sc].dd[f.k].push(mdd);
+    mdds.push(mdd);
   });
+  return{rets:rets,mdds:mdds};
 }
-var saMean=function(arr){return arr.length?arr.reduce(function(a,b){return a+b},0)/arr.length:null};
-var saMed=function(arr){if(!arr.length)return null;var s=arr.slice().sort(function(a,b){return a-b});return s[Math.floor(s.length/2)]};
-var saWr=function(arr){if(!arr.length)return null;return arr.filter(function(v){return v>0}).length/arr.length};
-var saP90=function(arr){if(!arr.length)return null;var s=arr.slice().sort(function(a,b){return a-b});return s[Math.floor(s.length*0.1)]};// 10th percentile of returns = 90th pctile of severity for DD
+function percentile(arr,p){if(!arr.length)return null;var s=arr.slice().sort(function(a,b){return a-b});var i=p*(s.length-1);var lo=Math.floor(i),hi=Math.ceil(i);return lo===hi?s[lo]:s[lo]+(i-lo)*(s[hi]-s[lo]);}
+var saMed2=function(arr){return percentile(arr,0.5)};
+var saWr2=function(arr){return arr.length?arr.filter(function(v){return v>0}).length/arr.length:null};
+var saMean2=function(arr){return arr.length?arr.reduce(function(a,b){return a+b},0)/arr.length:null};
 
-// Heatmap colour function: green for positive, red for negative, intensity scales with magnitude
+// Heatmap colours (reused)
 function heatBg(val,isDD){
   if(val==null)return 'transparent';
-  if(isDD){// drawdowns are always negative, deeper = more intense red
-    var a=Math.min(1,Math.abs(val)/0.25);// full intensity at -25%
-    return 'rgba(220,38,38,'+(0.06+a*0.22)+')';
+  if(isDD){var a=Math.min(1,Math.abs(val)/0.20);return 'rgba(220,38,38,'+(0.06+a*0.22)+')';}
+  if(val>0){var a=Math.min(1,val/0.12);return 'rgba(21,128,61,'+(0.05+a*0.2)+')';}
+  else{var a=Math.min(1,Math.abs(val)/0.12);return 'rgba(220,38,38,'+(0.06+a*0.22)+')';}
+}
+function heatFg(val,isDD){if(val==null)return '#aaa';if(isDD)return '#b91c1c';return val>0?'#15803d':'#dc2626';}
+
+// Build summary table + box plot data for a panel
+function buildPanel(episodes,targetId,chartId,direction){
+  var fs=M?'10px':'12px',subFs=M?'8.5px':'10px',cp=M?'4px 3px':'5px 6px';
+  var html='<table style="width:100%;min-width:'+(M?'420px':'0')+';border-collapse:collapse;font-size:'+fs+';line-height:1.3">';
+  html+='<thead><tr style="border-bottom:2px solid #ccc">';
+  html+='<th style="text-align:left;padding:'+cp+';font-weight:700;position:sticky;left:0;background:var(--cd,#fff);z-index:1">'+(direction==='det'?'Score ↑':'Score ↓')+'</th>';
+  html+='<th style="padding:'+cp+';text-align:center;font-weight:600">N</th>';
+  saHorizons.forEach(function(h){html+='<th style="padding:'+cp+';text-align:center;font-weight:600">'+h.k+'</th>'});
+  html+='<th style="padding:'+cp+';text-align:center;font-weight:600;border-left:2px solid #ddd">MDD 12W</th>';
+  html+='</tr>';
+  html+='<tr style="border-bottom:1px solid #e5e5e5;font-size:'+subFs+';color:#888">';
+  html+='<th style="position:sticky;left:0;background:var(--cd,#fff);z-index:1;padding:0 3px 2px"></th>';
+  html+='<th style="padding:0 3px 2px;text-align:center">episodes</th>';
+  saHorizons.forEach(function(){html+='<th style="padding:0 2px 2px;text-align:center">med · hit%</th>'});
+  html+='<th style="padding:0 2px 2px;text-align:center;border-left:2px solid #ddd">avg · p90</th>';
+  html+='</tr></thead><tbody>';
+
+  // Box plot data collectors
+  var bpData=[];// {score,horizon,p10,p25,med,p75,p90}
+
+  var minScore=direction==='det'?1:0,maxScore=direction==='det'?6:5;
+  for(var si=minScore;si<=maxScore;si++){
+    var eps=episodes[si];
+    if(!eps.length)continue;
+    var pctDays=(eps.length);
+    html+='<tr style="border-bottom:1px solid #f0f0f0">';
+    html+='<td style="padding:'+cp+';white-space:nowrap;position:sticky;left:0;background:var(--cd,#fff);z-index:1"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+saScoreColors[si]+';margin-right:3px;vertical-align:middle"></span><strong>'+saScoreLabels[si]+'</strong></td>';
+    html+='<td style="padding:'+cp+';text-align:center" class="mono">'+eps.length+'</td>';
+    saHorizons.forEach(function(h){
+      var st=epStats(eps,h.d);
+      var med=saMed2(st.rets),wr=saWr2(st.rets);
+      var bg=heatBg(med,false),fg=heatFg(med,false);
+      html+='<td style="padding:'+cp+';text-align:center;background:'+bg+'" class="mono">';
+      html+='<span style="color:'+fg+';font-weight:600">'+(med!=null?pct(med):'—')+'</span>';
+      if(wr!=null)html+='<br><span style="font-size:'+subFs+';color:#888">'+(wr*100).toFixed(0)+'%</span>';
+      html+='</td>';
+      // Collect box plot data for returns
+      if(st.rets.length>=3){
+        bpData.push({score:si,horizon:h.k,type:'ret',
+          p10:percentile(st.rets,0.1),p25:percentile(st.rets,0.25),
+          med:saMed2(st.rets),p75:percentile(st.rets,0.75),p90:percentile(st.rets,0.9)});
+      }
+    });
+    // MDD 12W
+    var mddSt=epStats(eps,63);
+    var avgMDD=saMean2(mddSt.mdds),p90MDD=percentile(mddSt.mdds,0.1);// 10th pctile = worst
+    var bgDD=heatBg(avgMDD,true);
+    html+='<td style="padding:'+cp+';text-align:center;background:'+bgDD+';border-left:2px solid #ddd" class="mono">';
+    html+='<span style="color:#b91c1c;font-weight:600">'+(avgMDD!=null?pct(avgMDD):'—')+'</span>';
+    if(p90MDD!=null)html+='<br><span style="font-size:'+subFs+';color:#999">p90 '+pct(p90MDD)+'</span>';
+    html+='</td>';
+    // MDD box plot data
+    if(mddSt.mdds.length>=3){
+      bpData.push({score:si,horizon:'MDD',type:'mdd',
+        p10:percentile(mddSt.mdds,0.1),p25:percentile(mddSt.mdds,0.25),
+        med:saMed2(mddSt.mdds),p75:percentile(mddSt.mdds,0.75),p90:percentile(mddSt.mdds,0.9)});
+    }
+    html+='</tr>';
   }
-  if(val>0){
-    var a=Math.min(1,val/0.15);// full green at +15%
-    return 'rgba(21,128,61,'+(0.05+a*0.2)+')';
-  } else {
-    var a=Math.min(1,Math.abs(val)/0.15);
-    return 'rgba(220,38,38,'+(0.06+a*0.22)+')';
-  }
-}
-function heatFg(val,isDD){
-  if(val==null)return '#aaa';
-  if(isDD)return '#b91c1c';
-  return val>0?'#15803d':'#dc2626';
-}
+  html+='</tbody></table>';
+  html+='<div style="font-size:'+subFs+';color:#999;margin-top:4px;padding:0 3px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+' score. Forward returns from T+1. Cells: <strong>median</strong> · <em>hit%</em>.</div>';
+  $(targetId).innerHTML=html;
 
-var saLabels=M?['0','1','2','3','4','5','6']:['0 Clear','1 Watch','2 Elev','3 High','4','5','6 Max'];
-var saLabelsSub=M?['Clear','Watch','Elev','High','','','Max']:null;
-var saColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626','#7f1d1d'];
-var totalDays=R.length;
-var fs=M?'10px':'12px';
-var cp=M?'4px 3px':'5px 6px';
-var subFs=M?'8.5px':'10px';
-
-var saHtml='<table style="width:100%;min-width:'+(M?'480px':'0')+';border-collapse:collapse;font-size:'+fs+';line-height:1.3">';
-// Header row
-saHtml+='<thead><tr style="border-bottom:2px solid #ccc">';
-saHtml+='<th style="text-align:left;padding:'+cp+';font-weight:700;white-space:nowrap;position:sticky;left:0;background:var(--cd,#fff);z-index:1">Score</th>';
-fwdLookups.forEach(function(f){saHtml+='<th style="padding:'+cp+';text-align:center;font-weight:600">'+f.l+'</th>'});
-saHtml+='<th style="padding:'+cp+';text-align:center;font-weight:600;border-left:2px solid #ddd">MDD 12W</th>';
-saHtml+='<th style="padding:'+cp+';text-align:center;font-weight:600">MDD 26W</th>';
-saHtml+='</tr>';
-// Sub-header
-saHtml+='<tr style="border-bottom:1px solid #e5e5e5;font-size:'+subFs+';color:#888">';
-saHtml+='<th style="text-align:left;padding:0 3px 2px;position:sticky;left:0;background:var(--cd,#fff);z-index:1"></th>';
-fwdLookups.forEach(function(){saHtml+='<th style="padding:0 2px 2px;text-align:center">med · hit%</th>'});
-saHtml+='<th style="padding:0 2px 2px;text-align:center;border-left:2px solid #ddd">avg · p90</th>';
-saHtml+='<th style="padding:0 2px 2px;text-align:center">avg · p90</th>';
-saHtml+='</tr></thead><tbody>';
-
-for(var si=0;si<=6;si++){
-  var ss=scoreStats[si];
-  if(ss.n===0)continue;
-  var pctDays=(ss.n/totalDays*100);
-  // Score label cell with compact distribution pill
-  saHtml+='<tr style="border-bottom:1px solid #f0f0f0">';
-  saHtml+='<td style="padding:'+cp+';white-space:nowrap;position:sticky;left:0;background:var(--cd,#fff);z-index:1"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+saColors[si]+';margin-right:3px;vertical-align:middle"></span><strong>'+saLabels[si]+'</strong> <span style="color:#999;font-size:'+subFs+'">'+pctDays.toFixed(1)+'%</span></td>';
-  // Forward return cells: median + hit rate
-  fwdLookups.forEach(function(f){
-    var med=saMed(ss.fwd[f.k]);
-    var wr=saWr(ss.fwd[f.k]);
-    var bg=heatBg(med,false);
-    var fg=heatFg(med,false);
-    saHtml+='<td style="padding:'+cp+';text-align:center;background:'+bg+'" class="mono">';
-    saHtml+='<span style="color:'+fg+';font-weight:600">'+(med!=null?pct(med):'—')+'</span>';
-    if(wr!=null)saHtml+='<br><span style="font-size:'+subFs+';color:#888">'+(wr*100).toFixed(0)+'%</span>';
-    saHtml+='</td>';
+  // === Box Plot Chart via Plotly ===
+  // Group by horizon, x-axis = score labels, show p10-p90 as error bars, p25-p75 as box
+  var horizonList=saHorizons.map(function(h){return h.k}).concat(['MDD']);
+  var horizonColors={'1W':'#6366f1','4W':'#2563eb','12W':'#0891b2','MDD':'#dc2626'};
+  var traces=[];
+  horizonList.forEach(function(hk){
+    var pts=bpData.filter(function(d){return d.horizon===hk});
+    if(!pts.length)return;
+    // Use box trace with precomputed stats
+    pts.forEach(function(pt){
+      var xLabel=saScoreLabels[pt.score];
+      // We'll use a scatter + error bar approach for clean rendering
+      traces.push({
+        x:[hk],y:[pt.med*100],
+        error_y:{type:'data',symmetric:false,array:[(pt.p75-pt.med)*100],arrayminus:[(pt.med-pt.p25)*100],thickness:M?6:10,width:0,color:horizonColors[hk]||'#555'},
+        type:'scatter',mode:'markers',
+        marker:{color:horizonColors[hk]||'#555',size:M?6:8,symbol:'diamond'},
+        name:xLabel,legendgroup:'s'+pt.score,showlegend:hk===horizonList[0],
+        hovertemplate:xLabel+'<br>'+hk+': med '+pct(pt.med)+'<br>p25–p75: '+pct(pt.p25)+' to '+pct(pt.p75)+'<extra></extra>'
+      });
+      // Whiskers: p10 to p90
+      traces.push({
+        x:[hk,hk],y:[pt.p10*100,pt.p90*100],
+        type:'scatter',mode:'lines',line:{color:horizonColors[hk]||'#555',width:M?0.7:1,dash:'dot'},
+        showlegend:false,legendgroup:'s'+pt.score,hoverinfo:'skip'
+      });
+    });
   });
-  // Drawdown cells: avg + 90th percentile
-  ddLookups.forEach(function(f,di){
-    var avg=saMean(ss.dd[f.k]);
-    var p90=saP90(ss.dd[f.k]);// worst 10% of MDD
-    var bg=heatBg(avg,true);
-    saHtml+='<td style="padding:'+cp+';text-align:center;background:'+bg+(di===0?';border-left:2px solid #ddd':'')+'" class="mono">';
-    saHtml+='<span style="color:#b91c1c;font-weight:600">'+(avg!=null?pct(avg):'—')+'</span>';
-    if(p90!=null)saHtml+='<br><span style="font-size:'+subFs+';color:#999">p90 '+pct(p90)+'</span>';
-    saHtml+='</td>';
+
+  // Better approach: grouped bar-like box plots per score
+  // X = score, grouped traces per horizon
+  var traces2=[];
+  var activeScores=[];
+  for(var s=minScore;s<=maxScore;s++){if(episodes[s].length)activeScores.push(s);}
+  var xLabels=activeScores.map(function(s){return saScoreLabels[s]});
+
+  saHorizons.forEach(function(h){
+    var y=[],ep10=[],ep90=[],ep25=[],ep75=[];
+    activeScores.forEach(function(s){
+      var pt=bpData.filter(function(d){return d.score===s&&d.horizon===h.k})[0];
+      if(pt){
+        y.push(pt.med*100);
+        ep75.push((pt.p75-pt.med)*100);
+        ep25.push((pt.med-pt.p25)*100);
+      } else {y.push(null);ep75.push(0);ep25.push(0);}
+    });
+    traces2.push({
+      x:xLabels,y:y,
+      error_y:{type:'data',symmetric:false,array:ep75,arrayminus:ep25,thickness:M?4:8,width:M?3:6,color:horizonColors[h.k]},
+      type:'bar',name:h.k,marker:{color:horizonColors[h.k],opacity:0.7},
+      width:0.18,offset:saHorizons.indexOf(h)*0.2-0.2,
+      hovertemplate:'%{x}<br>'+h.k+': %{y:.1f}%<extra></extra>'
+    });
   });
-  saHtml+='</tr>';
+  // MDD as separate trace (negative values)
+  var mddY=[],mddE75=[],mddE25=[];
+  activeScores.forEach(function(s){
+    var pt=bpData.filter(function(d){return d.score===s&&d.horizon==='MDD'})[0];
+    if(pt){mddY.push(pt.med*100);mddE75.push((pt.p75-pt.med)*100);mddE25.push((pt.med-pt.p25)*100);}
+    else{mddY.push(null);mddE75.push(0);mddE25.push(0);}
+  });
+  traces2.push({
+    x:xLabels,y:mddY,
+    error_y:{type:'data',symmetric:false,array:mddE75,arrayminus:mddE25,thickness:M?4:8,width:M?3:6,color:'#dc2626'},
+    type:'bar',name:'MDD 12W',marker:{color:'#dc2626',opacity:0.5},
+    width:0.18,offset:0.4,
+    hovertemplate:'%{x}<br>MDD: %{y:.1f}%<extra></extra>'
+  });
+  // Zero line
+  traces2.push({
+    x:[xLabels[0],xLabels[xLabels.length-1]],y:[0,0],
+    type:'scatter',mode:'lines',line:{color:'#999',width:1,dash:'dash'},
+    showlegend:false,hoverinfo:'skip'
+  });
+
+  Plotly.newPlot(chartId.replace('#',''),traces2,Object.assign({},PL(),{
+    barmode:'group',bargap:0.25,bargroupgap:0.08,
+    yaxis:Object.assign({},PL().yaxis,{title:'%',zeroline:true,zerolinecolor:'#ccc',zerolinewidth:1}),
+    legend:Object.assign({},PL().legend,{y:M?-0.35:-0.25}),
+    margin:Object.assign({},PL().margin,{b:M?60:55,t:8})
+  }),PC);
 }
-// All row
-saHtml+='<tr style="border-top:2px solid #bbb;font-weight:600"><td style="padding:'+cp+';position:sticky;left:0;background:var(--cd,#fff);z-index:1">All <span style="color:#999;font-size:'+subFs+';font-weight:400">'+fmt(totalDays)+'d</span></td>';
-var allFwd={},allDD={};
-fwdLookups.forEach(function(f){var a=[];for(var s=0;s<=6;s++)a=a.concat(scoreStats[s].fwd[f.k]);allFwd[f.k]=a});
-ddLookups.forEach(function(f){var a=[];for(var s=0;s<=6;s++)a=a.concat(scoreStats[s].dd[f.k]);allDD[f.k]=a});
-fwdLookups.forEach(function(f){
-  var med=saMed(allFwd[f.k]),wr=saWr(allFwd[f.k]);
-  var bg=heatBg(med,false),fg=heatFg(med,false);
-  saHtml+='<td style="padding:'+cp+';text-align:center;background:'+bg+'" class="mono"><span style="color:'+fg+'">'+pct(med)+'</span>';
-  if(wr!=null)saHtml+='<br><span style="font-size:'+subFs+';color:#888">'+(wr*100).toFixed(0)+'%</span>';
-  saHtml+='</td>';
-});
-ddLookups.forEach(function(f,di){
-  var avg=saMean(allDD[f.k]),p90=saP90(allDD[f.k]);
-  var bg=heatBg(avg,true);
-  saHtml+='<td style="padding:'+cp+';text-align:center;background:'+bg+(di===0?';border-left:2px solid #ddd':'')+'" class="mono"><span style="color:#b91c1c">'+pct(avg)+'</span>';
-  if(p90!=null)saHtml+='<br><span style="font-size:'+subFs+';color:#999">p90 '+pct(p90)+'</span>';
-  saHtml+='</td>';
-});
-saHtml+='</tr></tbody></table>';
-saHtml+='<div style="font-size:'+subFs+';color:#999;margin-top:5px;padding:0 3px">Forward returns from T+1 (excludes signal day). Cells: <strong>median</strong> · <em>hit%</em>. Drawdowns: <strong>avg MDD</strong> · <em>p90 worst</em>. Colour intensity ∝ magnitude.</div>';
-$('#score-analysis').innerHTML=saHtml;
+
+buildPanel(detEpisodes,'#sa-det-summary','#sa-det-chart','det');
+buildPanel(impEpisodes,'#sa-imp-summary','#sa-imp-chart','imp');
 
 // Allocation history (2Y sparkline)
 var ah=MON.allocHist||[];
