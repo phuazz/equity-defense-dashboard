@@ -111,7 +111,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
-<div class="ch"><div class="ch-t">Score Distribution (% of all days)</div><div id="ch-sdist" style="height:140px"></div></div>
+<div class="ch"><div class="ch-t">Score Analysis — Distribution & Forward Returns</div><div id="score-analysis" style="min-height:80px"></div></div>
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
 </div>
@@ -258,10 +258,79 @@ var ad=MON.avgDuration||[0,0,0,0,0,0,0];
 var sd=MON.scoreDist||[0,0,0,0,0,0,0];
 $('#mon-context').innerHTML='<div class="qi"><span>Current regime</span><span class="mono"><strong>Score '+cs+'</strong> for <strong>'+rd+'</strong> days</span></div><div class="qi"><span>Avg duration at score '+cs+'</span><span class="mono">'+ad[cs]+' days</span></div><div class="qi"><span>% of history at score 0 (all clear)</span><span class="mono">'+(sd[0]*100).toFixed(1)+'%</span></div><div class="qi"><span>% of history at score ≥2 (defensive)</span><span class="mono">'+((sd[2]+(sd[3]||0)+(sd[4]||0)+(sd[5]||0)+(sd[6]||0))*100).toFixed(1)+'%</span></div>';
 
-// Score distribution chart
-var sdLabels=['0\nClear','1\nWatch','2\nElev','3\nHigh','4','5','6\nMax'];
-var sdColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626','#7f1d1d'];
-Plotly.newPlot('ch-sdist',[{x:sdLabels,y:sd.map(function(v){return v*100}),type:'bar',marker:{color:sdColors},text:sd.map(function(v){return (v*100).toFixed(1)+'%'}),textposition:'outside',textfont:{size:M?9:11}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{title:'% of days'}),margin:Object.assign({},PL().margin,{b:M?40:50})}),PC);
+// Score Analysis — Distribution + Forward Returns by Score
+// Compute forward returns from R array. IMPORTANT: forward return starts T+1 (day AFTER signal date)
+var fwdLookups=[{k:'1M',d:21},{k:'3M',d:63},{k:'6M',d:126},{k:'12M',d:252}];
+var scoreStats={};
+for(var si=0;si<=6;si++){scoreStats[si]={n:0,fwd:{},dd:{}};fwdLookups.forEach(function(f){scoreStats[si].fwd[f.k]=[];scoreStats[si].dd[f.k]=[]});}
+for(var ri=0;ri<R.length;ri++){
+  var sc=R[ri].compositeScore;if(sc==null)continue;
+  scoreStats[sc].n++;
+  fwdLookups.forEach(function(f){
+    var endIdx=ri+1+f.d;// T+1 start, look f.d trading days ahead
+    if(endIdx>=R.length)return;
+    var p0=R[ri+1].spx;// T+1 price (day after signal)
+    if(!p0)return;
+    var pEnd=R[endIdx].spx;
+    var ret=(pEnd-p0)/p0;
+    scoreStats[sc].fwd[f.k].push(ret);
+    // Max drawdown over the window [ri+1..endIdx]
+    var peak=p0,mdd=0;
+    for(var di=ri+1;di<=endIdx;di++){
+      if(R[di].spx>peak)peak=R[di].spx;
+      var dd=(R[di].spx-peak)/peak;
+      if(dd<mdd)mdd=dd;
+    }
+    scoreStats[sc].dd[f.k].push(mdd);
+  });
+}
+var saLabels=['0 Clear','1 Watch','2 Elev','3 High','4','5','6 Max'];
+var saColors=['#15803d','#b45309','#b45309','#dc2626','#dc2626','#dc2626','#7f1d1d'];
+var saMean=function(arr){return arr.length?arr.reduce(function(a,b){return a+b},0)/arr.length:null};
+var saMed=function(arr){if(!arr.length)return null;var s=arr.slice().sort(function(a,b){return a-b});return s[Math.floor(s.length/2)]};
+var saWr=function(arr){if(!arr.length)return null;return arr.filter(function(v){return v>0}).length/arr.length};
+
+var saHtml='<table style="width:100%;border-collapse:collapse;font-size:'+(M?'10px':'12px')+';line-height:1.4">';
+saHtml+='<thead><tr style="border-bottom:2px solid #ddd;text-align:right">';
+saHtml+='<th style="text-align:left;padding:4px 6px">Score</th>';
+saHtml+='<th style="padding:4px 6px;text-align:center">Days</th>';
+saHtml+='<th style="padding:4px 6px;text-align:center">%</th>';
+fwdLookups.forEach(function(f){saHtml+='<th style="padding:4px 3px;text-align:center">Avg '+f.k+'</th>'});
+saHtml+='<th style="padding:4px 3px;text-align:center">Avg MDD 12M</th>';
+saHtml+='<th style="padding:4px 3px;text-align:center">12M Win%</th>';
+saHtml+='</tr></thead><tbody>';
+
+var totalDays=R.length;
+for(var si=0;si<=6;si++){
+  var ss=scoreStats[si];
+  var pctDays=totalDays?(ss.n/totalDays*100):0;
+  if(ss.n===0&&si>=5){continue;}// skip empty high scores
+  var barW=Math.max(2,pctDays*1.8);
+  var retC=function(v){return v==null?'color:#aaa':v>0?'color:#15803d':'color:#dc2626'};
+  saHtml+='<tr style="border-bottom:1px solid #f0f0f0">';
+  saHtml+='<td style="padding:4px 6px;font-weight:600;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+saColors[si]+';margin-right:4px;vertical-align:middle"></span>'+saLabels[si]+'</td>';
+  saHtml+='<td style="padding:4px 6px;text-align:center" class="mono">'+fmt(ss.n)+'</td>';
+  saHtml+='<td style="padding:4px 6px;text-align:center"><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div style="width:'+barW+'px;height:10px;background:'+saColors[si]+';border-radius:2px;flex-shrink:0"></div><span class="mono" style="min-width:38px;text-align:right">'+pctDays.toFixed(1)+'%</span></div></td>';
+  fwdLookups.forEach(function(f){
+    var avg=saMean(ss.fwd[f.k]);
+    saHtml+='<td style="padding:4px 3px;text-align:center;'+retC(avg)+'" class="mono">'+(avg!=null?pct(avg):'—')+'</td>';
+  });
+  var avgMDD=saMean(ss.dd['12M']);
+  saHtml+='<td style="padding:4px 3px;text-align:center;color:#dc2626" class="mono">'+(avgMDD!=null?pct(avgMDD):'—')+'</td>';
+  var wr12=saWr(ss.fwd['12M']);
+  saHtml+='<td style="padding:4px 3px;text-align:center;'+(wr12!=null?(wr12>=0.5?'color:#15803d':'color:#dc2626'):'color:#aaa')+'" class="mono">'+(wr12!=null?(wr12*100).toFixed(0)+'%':'—')+'</td>';
+  saHtml+='</tr>';
+}
+// Totals row
+saHtml+='<tr style="border-top:2px solid #bbb;font-weight:700"><td style="padding:4px 6px">All</td><td style="padding:4px 6px;text-align:center" class="mono">'+fmt(totalDays)+'</td><td style="padding:4px 6px;text-align:center" class="mono">100%</td>';
+var allFwd={};fwdLookups.forEach(function(f){var all=[];for(var s=0;s<=6;s++)all=all.concat(scoreStats[s].fwd[f.k]);allFwd[f.k]=all});
+fwdLookups.forEach(function(f){var avg=saMean(allFwd[f.k]);var retC=avg==null?'color:#aaa':avg>0?'color:#15803d':'color:#dc2626';saHtml+='<td style="padding:4px 3px;text-align:center;'+retC+'" class="mono">'+pct(avg)+'</td>'});
+var allDD=[];for(var s=0;s<=6;s++)allDD=allDD.concat(scoreStats[s].dd['12M']);
+saHtml+='<td style="padding:4px 3px;text-align:center;color:#dc2626" class="mono">'+pct(saMean(allDD))+'</td>';
+var allWr=saWr(allFwd['12M']);saHtml+='<td style="padding:4px 3px;text-align:center" class="mono">'+(allWr!=null?(allWr*100).toFixed(0)+'%':'—')+'</td>';
+saHtml+='</tr></tbody></table>';
+saHtml+='<div style="font-size:10px;color:#888;margin-top:4px">Forward returns measured from T+1 (day after score observation). N = number of days observed at each score.</div>';
+$('#score-analysis').innerHTML=saHtml;
 
 // Allocation history (2Y sparkline)
 var ah=MON.allocHist||[];
