@@ -111,8 +111,8 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
-<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-det-chart" style="height:260px;margin-top:4px"></div></div>
-<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-imp-chart" style="height:260px;margin-top:4px"></div></div>
+<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-det-chart" style="margin-top:4px"></div></div>
+<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-summary" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div><div id="sa-imp-chart" style="margin-top:4px"></div></div>
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
 </div>
@@ -328,14 +328,13 @@ function buildPanel(episodes,targetId,chartId,direction){
   html+='<th style="padding:0 2px 2px;text-align:center;border-left:2px solid #ddd">avg · p90</th>';
   html+='</tr></thead><tbody>';
 
-  // Box plot data collectors
-  var bpData=[];// {score,horizon,p10,p25,med,p75,p90}
-
+  var bpData=[];
   var minScore=direction==='det'?1:0,maxScore=direction==='det'?6:5;
+  var activeScores=[];
   for(var si=minScore;si<=maxScore;si++){
     var eps=episodes[si];
     if(!eps.length)continue;
-    var pctDays=(eps.length);
+    activeScores.push(si);
     html+='<tr style="border-bottom:1px solid #f0f0f0">';
     html+='<td style="padding:'+cp+';white-space:nowrap;position:sticky;left:0;background:var(--cd,#fff);z-index:1"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+saScoreColors[si]+';margin-right:3px;vertical-align:middle"></span><strong>'+saScoreLabels[si]+'</strong></td>';
     html+='<td style="padding:'+cp+';text-align:center" class="mono">'+eps.length+'</td>';
@@ -347,24 +346,21 @@ function buildPanel(episodes,targetId,chartId,direction){
       html+='<span style="color:'+fg+';font-weight:600">'+(med!=null?pct(med):'—')+'</span>';
       if(wr!=null)html+='<br><span style="font-size:'+subFs+';color:#888">'+(wr*100).toFixed(0)+'%</span>';
       html+='</td>';
-      // Collect box plot data for returns
       if(st.rets.length>=3){
-        bpData.push({score:si,horizon:h.k,type:'ret',
+        bpData.push({score:si,horizon:h.k,type:'ret',raw:st.rets,
           p10:percentile(st.rets,0.1),p25:percentile(st.rets,0.25),
           med:saMed2(st.rets),p75:percentile(st.rets,0.75),p90:percentile(st.rets,0.9)});
       }
     });
-    // MDD 12W
     var mddSt=epStats(eps,63);
-    var avgMDD=saMean2(mddSt.mdds),p90MDD=percentile(mddSt.mdds,0.1);// 10th pctile = worst
+    var avgMDD=saMean2(mddSt.mdds),p90MDD=percentile(mddSt.mdds,0.1);
     var bgDD=heatBg(avgMDD,true);
     html+='<td style="padding:'+cp+';text-align:center;background:'+bgDD+';border-left:2px solid #ddd" class="mono">';
     html+='<span style="color:#b91c1c;font-weight:600">'+(avgMDD!=null?pct(avgMDD):'—')+'</span>';
     if(p90MDD!=null)html+='<br><span style="font-size:'+subFs+';color:#999">p90 '+pct(p90MDD)+'</span>';
     html+='</td>';
-    // MDD box plot data
     if(mddSt.mdds.length>=3){
-      bpData.push({score:si,horizon:'MDD',type:'mdd',
+      bpData.push({score:si,horizon:'MDD 12W',type:'mdd',raw:mddSt.mdds,
         p10:percentile(mddSt.mdds,0.1),p25:percentile(mddSt.mdds,0.25),
         med:saMed2(mddSt.mdds),p75:percentile(mddSt.mdds,0.75),p90:percentile(mddSt.mdds,0.9)});
     }
@@ -374,87 +370,175 @@ function buildPanel(episodes,targetId,chartId,direction){
   html+='<div style="font-size:'+subFs+';color:#999;margin-top:4px;padding:0 3px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+' score. Forward returns from T+1. Cells: <strong>median</strong> · <em>hit%</em>.</div>';
   $(targetId).innerHTML=html;
 
-  // === Box Plot Chart via Plotly ===
-  // Group by horizon, x-axis = score labels, show p10-p90 as error bars, p25-p75 as box
-  var horizonList=saHorizons.map(function(h){return h.k}).concat(['MDD']);
-  var horizonColors={'1W':'#6366f1','4W':'#2563eb','12W':'#0891b2','MDD':'#dc2626'};
+  // === Horizontal Box Plot Grid ===
+  if(!activeScores.length)return;
+
+  var panelsAll=[{k:'1W',l:'1W Fwd Return'},{k:'4W',l:'4W Fwd Return'},{k:'12W',l:'12W Fwd Return'},{k:'MDD 12W',l:'Max Drawdown 12W'}];
+  // On mobile, show only 3 key panels in a single column to avoid cramming
+  var panels=M?[panelsAll[1],panelsAll[2],panelsAll[3]]:panelsAll;
+  var panelColors={'1W':'rgba(99,102,241,','4W':'rgba(37,99,235,','12W':'rgba(8,145,178,','MDD 12W':'rgba(220,38,38,'};
+  var nP=panels.length;
+  var yLabels=activeScores.map(function(s){return saScoreLabels[s]}).reverse();
+  var rowH=M?30:40;
+  var panelH=activeScores.length*rowH+(M?50:60);
+  var chartH=M?panelH*nP+(nP-1)*20+20:panelH+40;// mobile: stacked; desktop: single row
+
+  var cEl=document.querySelector(chartId);
+  cEl.style.height=chartH+'px';
+  cEl.innerHTML='';
+
   var traces=[];
-  horizonList.forEach(function(hk){
-    var pts=bpData.filter(function(d){return d.horizon===hk});
-    if(!pts.length)return;
-    // Use box trace with precomputed stats
-    pts.forEach(function(pt){
-      var xLabel=saScoreLabels[pt.score];
-      // We'll use a scatter + error bar approach for clean rendering
+  var annotations=[];
+  var shapes=[];
+
+  // Layout grid: desktop = nP columns x 1 row; mobile = 1 column x nP rows
+  var gap=M?0.08:0.05;
+  var colW,rowHFrac;
+  if(M){
+    colW=1;// full width
+    rowHFrac=(1-gap*(nP-1))/nP;
+  } else {
+    colW=(1-gap*(nP-1))/nP;
+    rowHFrac=1;
+  }
+
+  panels.forEach(function(pObj,pi){
+    var pk=pObj.k;
+    var xAxis=pi===0?'x':'x'+(pi+1);
+    var yAxis=pi===0?'y':'y'+(pi+1);
+
+    // Column/panel title annotation
+    var titleXRef=xAxis+' domain';
+    var titleYRef=yAxis+' domain';
+    annotations.push({
+      text:'<b>'+pObj.l+'</b>',
+      x:M?0.5:0.5,y:1.0,
+      xref:titleXRef,yref:titleYRef,
+      showarrow:false,font:{size:M?10:11,color:'#444'},
+      yshift:M?2:4
+    });
+
+    activeScores.slice().reverse().forEach(function(sc,yi){
+      var pt=bpData.filter(function(d){return d.score===sc&&d.horizon===pk})[0];
+      if(!pt)return;
+      var vals=pt.raw.map(function(v){return v*100});
+      var baseColor=panelColors[pk]||'rgba(100,100,100,';
+      var fillAlpha=pt.med>=0&&pk!=='MDD 12W'?0.35:0.25;
+
       traces.push({
-        x:[hk],y:[pt.med*100],
-        error_y:{type:'data',symmetric:false,array:[(pt.p75-pt.med)*100],arrayminus:[(pt.med-pt.p25)*100],thickness:M?6:10,width:0,color:horizonColors[hk]||'#555'},
-        type:'scatter',mode:'markers',
-        marker:{color:horizonColors[hk]||'#555',size:M?6:8,symbol:'diamond'},
-        name:xLabel,legendgroup:'s'+pt.score,showlegend:hk===horizonList[0],
-        hovertemplate:xLabel+'<br>'+hk+': med '+pct(pt.med)+'<br>p25–p75: '+pct(pt.p25)+' to '+pct(pt.p75)+'<extra></extra>'
+        type:'box',
+        x:vals,
+        y:vals.map(function(){return saScoreLabels[sc]}),
+        orientation:'h',
+        xaxis:xAxis,yaxis:yAxis,
+        name:saScoreLabels[sc],
+        showlegend:false,
+        boxpoints:false,
+        line:{color:baseColor+'0.8)',width:M?1:1.5},
+        fillcolor:baseColor+fillAlpha+')',
+        whiskerwidth:0.5,
+        hoverinfo:'x',
+        hoveron:'boxes'
       });
-      // Whiskers: p10 to p90
-      traces.push({
-        x:[hk,hk],y:[pt.p10*100,pt.p90*100],
-        type:'scatter',mode:'lines',line:{color:horizonColors[hk]||'#555',width:M?0.7:1,dash:'dot'},
-        showlegend:false,legendgroup:'s'+pt.score,hoverinfo:'skip'
+
+      // Median annotation below box
+      var medX=pt.med*100;
+      annotations.push({
+        x:medX,y:saScoreLabels[sc],
+        xref:xAxis,yref:yAxis,
+        text:'<b>'+(pt.med>=0?'+':'')+(medX).toFixed(1)+'%</b>',
+        showarrow:false,
+        font:{size:M?8:9,color:pk==='MDD 12W'?'#991b1b':(pt.med>=0?'#15803d':'#b91c1c')},
+        yshift:M?-13:-15
       });
+
+      // p10/p90 whisker labels — show on desktop always, on mobile only for extremes
+      if(!M||sc>=3||sc<=1){
+        annotations.push({
+          x:pt.p10*100,y:saScoreLabels[sc],
+          xref:xAxis,yref:yAxis,
+          text:(pt.p10*100).toFixed(0),
+          showarrow:false,
+          font:{size:M?7:8,color:'#aaa'},
+          xshift:M?-10:-12
+        });
+        annotations.push({
+          x:pt.p90*100,y:saScoreLabels[sc],
+          xref:xAxis,yref:yAxis,
+          text:(pt.p90>=0?'+':'')+(pt.p90*100).toFixed(0),
+          showarrow:false,
+          font:{size:M?7:8,color:'#aaa'},
+          xshift:M?10:12
+        });
+      }
+    });
+
+    // Zero line as a shape — use paper coordinates for y to span full subplot
+    shapes.push({
+      type:'line',
+      x0:0,x1:0,
+      y0:0,y1:1,
+      xref:xAxis,yref:yAxis+' domain',
+      line:{color:'#bbb',width:1,dash:'dash'}
     });
   });
 
-  // Better approach: grouped bar-like box plots per score
-  // X = score, grouped traces per horizon
-  var traces2=[];
-  var activeScores=[];
-  for(var s=minScore;s<=maxScore;s++){if(episodes[s].length)activeScores.push(s);}
-  var xLabels=activeScores.map(function(s){return saScoreLabels[s]});
+  // Build layout with dynamic axis domains
+  var layout={
+    paper_bgcolor:'transparent',plot_bgcolor:'transparent',
+    font:{family:'Source Sans 3',size:M?9:11,color:'#555b6e'},
+    margin:{t:M?16:28,r:M?10:20,b:M?10:14,l:M?54:70},
+    height:chartH,
+    annotations:annotations,
+    shapes:shapes,
+    showlegend:false,
+    hovermode:M?'closest':'closest',
+    dragmode:false
+  };
 
-  saHorizons.forEach(function(h){
-    var y=[],ep10=[],ep90=[],ep25=[],ep75=[];
-    activeScores.forEach(function(s){
-      var pt=bpData.filter(function(d){return d.score===s&&d.horizon===h.k})[0];
-      if(pt){
-        y.push(pt.med*100);
-        ep75.push((pt.p75-pt.med)*100);
-        ep25.push((pt.med-pt.p25)*100);
-      } else {y.push(null);ep75.push(0);ep25.push(0);}
-    });
-    traces2.push({
-      x:xLabels,y:y,
-      error_y:{type:'data',symmetric:false,array:ep75,arrayminus:ep25,thickness:M?4:8,width:M?3:6,color:horizonColors[h.k]},
-      type:'bar',name:h.k,marker:{color:horizonColors[h.k],opacity:0.7},
-      width:0.18,offset:saHorizons.indexOf(h)*0.2-0.2,
-      hovertemplate:'%{x}<br>'+h.k+': %{y:.1f}%<extra></extra>'
-    });
-  });
-  // MDD as separate trace (negative values)
-  var mddY=[],mddE75=[],mddE25=[];
-  activeScores.forEach(function(s){
-    var pt=bpData.filter(function(d){return d.score===s&&d.horizon==='MDD'})[0];
-    if(pt){mddY.push(pt.med*100);mddE75.push((pt.p75-pt.med)*100);mddE25.push((pt.med-pt.p25)*100);}
-    else{mddY.push(null);mddE75.push(0);mddE25.push(0);}
-  });
-  traces2.push({
-    x:xLabels,y:mddY,
-    error_y:{type:'data',symmetric:false,array:mddE75,arrayminus:mddE25,thickness:M?4:8,width:M?3:6,color:'#dc2626'},
-    type:'bar',name:'MDD 12W',marker:{color:'#dc2626',opacity:0.5},
-    width:0.18,offset:0.4,
-    hovertemplate:'%{x}<br>MDD: %{y:.1f}%<extra></extra>'
-  });
-  // Zero line
-  traces2.push({
-    x:[xLabels[0],xLabels[xLabels.length-1]],y:[0,0],
-    type:'scatter',mode:'lines',line:{color:'#999',width:1,dash:'dash'},
-    showlegend:false,hoverinfo:'skip'
+  panels.forEach(function(pObj,pi){
+    var xKey=pi===0?'xaxis':'xaxis'+(pi+1);
+    var yKey=pi===0?'yaxis':'yaxis'+(pi+1);
+    var xAnchor=pi===0?'y':'y'+(pi+1);
+    var yAnchor=pi===0?'x':'x'+(pi+1);
+    var xDomain,yDomain;
+
+    if(M){
+      // Stacked vertically: each panel takes a row
+      var rowStart=1-(pi+1)*(rowHFrac)-(pi)*gap;
+      var rowEnd=rowStart+rowHFrac;
+      xDomain=[0,1];
+      yDomain=[Math.max(0,rowStart),Math.min(1,rowEnd)];
+    } else {
+      // Side by side: each panel takes a column
+      var colStart=pi*(colW+gap);
+      var colEnd=colStart+colW;
+      xDomain=[colStart,colEnd];
+      yDomain=[0,1];
+    }
+
+    layout[xKey]={
+      domain:xDomain,
+      gridcolor:'#eee',linecolor:'#eee',
+      tickfont:{size:M?8:10,color:'#888'},
+      zeroline:false,
+      ticksuffix:'%',
+      anchor:xAnchor
+    };
+    layout[yKey]={
+      domain:yDomain,
+      anchor:yAnchor,
+      gridcolor:'#f5f5f5',linecolor:'transparent',
+      tickfont:{size:M?8:10},
+      automargin:true,
+      showgrid:false,
+      categoryorder:'array',categoryarray:yLabels
+    };
+    // On desktop, only show y labels on first panel; on mobile show on all
+    if(!M&&pi>0){layout[yKey].showticklabels=false;}
   });
 
-  Plotly.newPlot(chartId.replace('#',''),traces2,Object.assign({},PL(),{
-    barmode:'group',bargap:0.25,bargroupgap:0.08,
-    yaxis:Object.assign({},PL().yaxis,{title:'%',zeroline:true,zerolinecolor:'#ccc',zerolinewidth:1}),
-    legend:Object.assign({},PL().legend,{y:M?-0.35:-0.25}),
-    margin:Object.assign({},PL().margin,{b:M?60:55,t:8})
-  }),PC);
+  Plotly.newPlot(chartId.replace('#',''),traces,layout,PC);
 }
 
 buildPanel(detEpisodes,'#sa-det-summary','#sa-det-chart','det');
