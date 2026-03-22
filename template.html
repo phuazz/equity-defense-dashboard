@@ -553,7 +553,7 @@ function buildPanel(episodes,chartId,noteId,direction){
 
       // Score 0 baseline gets a distinct muted style
       var isBase=sc===0&&direction==='det';
-      var isCurrent=sc===cs;
+      var isCurrent=sc===cs&&direction==='det';  // Only highlight current score in deterioration panel
       var bColor=isBase?'rgba(140,149,165,':baseColor;
       var bFill=isBase?0.15:fillAlpha;
       var lineW=isCurrent?(M?2:2.5):(M?1:1.5);
@@ -780,7 +780,7 @@ if(REG&&Object.keys(REG).length>0&&Object.keys(REG).some(function(k){return k!==
   rHtml+='<div class="sa" style="margin:10px 0">';
   regETFs.forEach(function(etf){
     var d=REG[etf.k];if(!d||!d.fwdByScore)return;
-    var sd=d.fwdByScore[cs];
+    var sd=d.fwdByScore[String(cs)];
     var med4w=sd&&sd['4W']?saMed2(sd['4W'].rets||[]):null;
     var med12w=sd&&sd['12W']?saMed2(sd['12W'].rets||[]):null;
     var mdd4w=sd&&sd['4W']?saMean2(sd['4W'].mdds||[]):null;
@@ -799,7 +799,7 @@ if(REG&&Object.keys(REG).length>0&&Object.keys(REG).some(function(k){return k!==
   // Charts: one per ETF with multi-horizon box plots (2 rows: returns + MDD, 3 cols: 1W/4W/12W)
   regETFs.forEach(function(etf){
     var d=REG[etf.k];if(!d||!d.fwdByScore)return;
-    rHtml+='<div class="ch"><div class="ch-t">'+etf.n+' — '+etf.l+' (returns top, MDD bottom)</div><div id="reg-'+etf.k+'" style="height:'+(M?'360':'320')+'px"></div></div>';
+    rHtml+='<div class="ch"><div class="ch-t">'+etf.n+' — '+etf.l+'</div><div id="reg-'+etf.k+'"></div></div>';
   });
 
   rHtml+='<div class="sec" style="font-size:14px">Beta to SPX by Regime</div>';
@@ -839,7 +839,7 @@ if(REG&&Object.keys(REG).length>0&&Object.keys(REG).some(function(k){return k!==
         xref:xAxis,yref:yAxis+' domain',line:{color:'#888',width:1.5}});
 
       scores.slice().reverse().forEach(function(sc){
-        var sd=d.fwdByScore[sc];
+        var sd=d.fwdByScore[String(sc)];
         var hd=sd?sd[pObj.h]:null;
         if(!hd)return;
         var arr=isDD?hd.mdds:hd.rets;
@@ -890,7 +890,7 @@ if(REG&&Object.keys(REG).length>0&&Object.keys(REG).some(function(k){return k!==
     var layout={paper_bgcolor:'transparent',plot_bgcolor:'transparent',
       font:{family:'Source Sans 3',size:M?9:11,color:'#555b6e'},
       margin:{t:M?18:24,r:M?10:16,b:M?10:14,l:M?54:70},
-      height:M?panelList.length*scores.length*32+panelList.length*40:scores.length*36*2+100,
+      height:M?panelList.length*scores.length*38+panelList.length*44:scores.length*44*2+120,
       annotations:annotations,shapes:shapes,showlegend:false,hovermode:'closest',dragmode:false};
     panelList.forEach(function(pObj,pi){
       var xKey=pi===0?'xaxis':'xaxis'+(pi+1);
