@@ -94,33 +94,99 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 .sig-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:3px;font-family:'IBM Plex Mono',monospace}
 .sig-note{font-size:11px;margin-top:4px;font-weight:500}
 ::-webkit-scrollbar{width:5px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
+
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+@media(min-width:600px){.sig-grid{grid-template-columns:repeat(6,1fr)}}
+.sig-pill{border-radius:8px;padding:8px 6px;text-align:center;border:1px solid var(--b);background:var(--cd)}
+.sig-pill-name{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sig-pill-val{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;line-height:1.3}
+.sig-pill-note{font-size:8px;color:var(--t3);margin-top:1px}
+.sig-pill.on-r{background:var(--red-bg);border-color:var(--red)}.sig-pill.on-r .sig-pill-val{color:var(--red)}
+.sig-pill.on-g{background:var(--grn-bg);border-color:var(--grn)}.sig-pill.on-g .sig-pill-val{color:var(--grn)}
+.sig-pill.on-a{background:var(--amb-bg);border-color:var(--amb)}.sig-pill.on-a .sig-pill-val{color:var(--amb)}
+.cio-box{border-radius:10px;padding:14px;margin:10px 0;font-size:13px;line-height:1.6;border:2px solid}
+.cio-box h4{font-family:'Source Serif 4',serif;font-size:14px;margin-bottom:6px}
+@media(min-width:768px){.cio-box{padding:16px 20px;font-size:14px}.cio-box h4{font-size:16px}}
+.ind-grid{display:grid;grid-template-columns:1fr;gap:8px}
+@media(min-width:900px){.ind-grid{grid-template-columns:1fr 1fr}}
+.ind-range-btns{display:flex;gap:4px;margin:8px 0;flex-wrap:wrap}
+.ind-range-btn{background:var(--sf);border:1px solid var(--b);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Source Sans 3',sans-serif;color:var(--t2);min-height:32px}
+.ind-range-btn.on{background:var(--blu);color:#fff;border-color:var(--blu)}
+.ind-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+@media(min-width:600px){.ind-strip{grid-template-columns:repeat(6,1fr)}}
+.reg-card{background:var(--cd);border:1px solid var(--b);border-radius:10px;padding:10px 12px}
+.reg-card-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3)}
+.reg-card-val{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;line-height:1.3}
+@media(min-width:768px){.reg-card-val{font-size:22px}}
 </style>
 </head>
 <body>
 <div id="loading"><h2>S&P 500 Risk Overlay</h2><div id="load-bar-wrap"><div id="load-bar"></div></div><div id="load-status">Initializing…</div><div id="load-log"></div><div id="cache-controls"><span id="cache-status"></span></div></div>
 <div class="hd"><div class="hd-inner"><div><h1>S&P 500 Risk Overlay <span>/ Regime Monitor</span></h1></div><div class="hd-right"><div class="mono" id="hd-period">—</div><div id="hd-updated">—</div></div></div></div>
 <div class="tabs"><div class="tabs-inner">
-<button class="tab on" data-t="t-mon">Monitor</button><button class="tab" data-t="t-ov">Overview</button><button class="tab" data-t="t-cmp">Compare</button><button class="tab" data-t="t-sig">Signals</button><button class="tab" data-t="t-str">Strategies</button><button class="tab" data-t="t-ev">Events</button><button class="tab" data-t="t-rsk">Risk</button><button class="tab" data-t="t-qc">QC</button>
+<button class="tab on" data-t="t-mon">Monitor</button><button class="tab" data-t="t-ind">Indicators</button><button class="tab" data-t="t-ov">Overview</button><button class="tab" data-t="t-cmp">Compare</button><button class="tab" data-t="t-sig">Signals</button><button class="tab" data-t="t-str">Strategies</button><button class="tab" data-t="t-ev">Events</button><button class="tab" data-t="t-reg">Regional</button><button class="tab" data-t="t-rsk">Risk</button><button class="tab" data-t="t-qc">QC</button>
 </div></div>
 <div class="pnl on" id="t-mon">
 <div id="regime-hero"></div>
-<div class="sec" style="font-size:14px">Current Allocation</div>
-<div id="mon-alloc"></div>
+<div id="mon-alloc" style="margin-top:4px"></div>
+<div id="cio-narrative"></div>
+<div class="sec" style="font-size:14px">Signal Dashboard</div>
+<div id="sig-dashboard" class="sig-grid"></div>
 <div class="ch"><div class="ch-t">S&P 500 — Last 12 Months</div><div id="ch-spx-recent" style="height:200px"></div></div>
-<div class="sec" style="font-size:14px">6 Risk Signals</div>
+<div class="sec" style="font-size:14px">Signal Detail</div>
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
+<div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
+<div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
+<div class="sec" style="font-size:14px">Score Episode Analysis</div>
+<div class="box" style="font-size:11px">What happens after score transitions? Box plots show forward return and drawdown distributions by score level at entry (deterioration) and exit (improvement). Shaded band = unconditional baseline.</div>
 <div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-chart" style="margin-top:4px"></div><div id="sa-det-note" style="padding:0 4px"></div></div>
 <div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-chart" style="margin-top:4px"></div><div id="sa-imp-note" style="padding:0 4px"></div></div>
-<div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
-<div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
+</div>
+<div class="pnl" id="t-ind">
+<div class="sec">Signal Time Series</div>
+<div id="ind-status-strip" class="ind-strip"></div>
+<div class="ind-range-btns" id="ind-range-btns">
+<button class="ind-range-btn" data-range="63">3M</button>
+<button class="ind-range-btn on" data-range="252">1Y</button>
+<button class="ind-range-btn" data-range="756">3Y</button>
+<button class="ind-range-btn" data-range="0">All</button>
+</div>
+<div class="ch" style="margin-bottom:4px"><div class="ch-t">Composite Score</div><div id="ind-score" style="height:180px"></div></div>
+<div class="ind-grid">
+<div class="ch"><div class="ch-t">SPX vs 200-Day MA</div><div id="ind-ma200" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">8-Day Stress Count</div><div id="ind-8d" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">SPY 12-Month Return</div><div id="ind-12m" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">Canary Assets</div><div id="ind-canary" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">10-Month SMA (Faber)</div><div id="ind-sma10" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">VIX Term Structure</div><div id="ind-vix" style="height:200px"></div></div>
+</div>
 </div>
 <div class="pnl" id="t-ov"><div class="g g4" id="ov-cards"></div><div class="ch"><div class="ch-t">S&P 500 Total Return + Stress Events</div><div id="ch-eq" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">Drawdown — All Strategies</div><div id="ch-dd" style="height:220px"></div></div><div class="ch"><div class="ch-t">8-Day Stress Count</div><div id="ch-bu" style="height:220px"></div></div></div><div class="ch"><div class="ch-t">Equity Curves (Log)</div><div id="ch-st" style="height:300px"></div></div></div>
 <div class="pnl" id="t-cmp"><div class="sec">Strategy Comparison</div><div class="tbl" id="cmp-tbl"></div><div class="ch"><div class="ch-t">Annual Returns</div><div id="ch-ann" style="height:280px"></div></div><div class="g g2"><div class="ch"><div class="ch-t">DD: Composite vs B&H</div><div id="ch-ddc" style="height:220px"></div></div><div class="ch"><div class="ch-t">Defensive Allocation %</div><div id="ch-alloc" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-sig"><div class="sec">Forward Returns After Stress Events</div><div class="box">What happens after a stress signal fires? <strong id="sig-n">—</strong> historical events analyzed across 1–12 month horizons.</div><div id="sig-cards" class="sa"></div><div class="sec" style="font-size:14px">Per-Event Returns</div><div class="tbl" id="sig-tbl"></div><div class="ch"><div class="ch-t">Forward Paths (12M)</div><div id="ch-fwd" style="height:260px"></div></div><div class="box" id="sig-interp"></div><div class="g g2"><div class="ch"><div class="ch-t">Max DD Distribution</div><div id="ch-fdd" style="height:220px"></div></div><div class="ch"><div class="ch-t">Distance from ATH at Signal</div><div id="ch-ath" style="height:220px"></div></div></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="sig-stats"></div></div>
 <div class="pnl" id="t-str"><div class="sec">6 Defensive Strategies</div><div class="sbox"><h3>S1: Enhanced Stress Signal</h3><p><strong>Entry:</strong> 8D count ≥115 OR (SPX &lt; 200d AND canary bad) → IEF. <strong>Exit:</strong> SPX &gt; 200d + canary clear + 63d cooldown.</p></div><div class="sbox"><h3>S2: Faber 10-Month SMA</h3><p>Monthly. SPX &gt; 10M SMA → SPY, else → IEF. Source: Faber (2007).</p></div><div class="sbox"><h3>S3: Dual Momentum (Antonacci)</h3><p>Monthly. SPY 12M &gt; IEF 12M AND &gt; 0 → SPY, else → IEF.</p></div><div class="sbox"><h3>S4: VIX Term Structure</h3><p>Daily. VIX/VIX3M &gt; 1.0 for 3 consecutive days (confirmed backwardation) → IEF, else → SPY. 3-day filter eliminates whipsaw from 1-2 day spikes. T+1 execution.</p></div><div class="sbox"><h3>S5a: Composite — IEF (Duration Hedge)</h3><p>Graduated defence into IEF (7-10Y UST). Benefits from flight-to-quality rallies in rate-cutting crises (2008, 2020). Risk: duration losses if rates rise during equity drawdowns (2022).</p></div><div class="sbox"><h3>S5b: Composite — SHY (Short Duration)</h3><p>Same signals, same Grad D allocation, but defensive asset is SHY (1-3Y UST, ~2yr duration). Minimal rate risk vs IEF's ~7yr duration. Small flight-to-quality benefit in crises. Avoids the 2022-style double-loss scenario. Data from Jul 2002.</p></div><div class="sbox"><h3>S6: Buy &amp; Hold</h3><p>100% SPY. Benchmark.</p></div></div>
 <div class="pnl" id="t-ev"><div class="sec">Defensive Trade Log</div><div class="box">Composite regime transitions — entry when score ≥2 (50%+ IEF), exit when score &lt;2. Graduated allocation: 2→50%, 3→75%, 4+→100%. Score=1 is watch-only. Click a row to see the SPX context chart.</div><div id="ev-trade-stats" class="sa" style="margin:8px 0"></div><div class="tbl" style="max-height:50vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Entry</th><th>Exit</th><th>Days</th><th>Type</th><th>Score</th><th>Avg IEF</th><th>VIX</th><th>SPX Δ</th><th>Max DD</th></tr></thead><tbody id="ev-body"></tbody></table></div><div class="ch" id="ev-ch-wrap" style="display:none"><div class="ch-t" id="ev-ch-title">—</div><div id="ch-ev-ctx" style="height:280px"></div></div><div class="sec" style="font-size:14px;margin-top:16px">Stress Events (Blowup Signals)</div><div id="ev-stress-stats" class="sa" style="margin:8px 0"></div><div class="tbl" style="max-height:40vh;overflow-y:auto"><table><thead><tr><th>#</th><th>Date</th><th>8D</th><th>SPX</th><th>ATH</th><th>Can</th><th>MA</th><th>VIX</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody id="ev-body2"></tbody></table></div></div>
+<div class="pnl" id="t-reg">
+<div class="sec">Regional Equity Impact</div>
+<div class="box">How do US risk regime changes affect China and ASEAN equities? Episode-based analysis: when the US composite score deteriorates to a given level, what are the forward returns and drawdowns for regional ETF proxies?</div>
+<div id="reg-summary" class="sa" style="margin:10px 0"></div>
+<div id="reg-narrative"></div>
+<div class="sec" style="font-size:14px">China — MCHI</div>
+<div class="ch"><div class="ch-t">MCHI Forward Returns by US Score Deterioration</div><div id="reg-mchi" style="height:260px"></div></div>
+<div class="sec" style="font-size:14px">ASEAN</div>
+<div class="g g2">
+<div class="ch"><div class="ch-t">Singapore (EWS)</div><div id="reg-ews" style="height:220px"></div></div>
+<div class="ch"><div class="ch-t">Malaysia (EWM)</div><div id="reg-ewm" style="height:220px"></div></div>
+<div class="ch"><div class="ch-t">Indonesia (EIDO)</div><div id="reg-eido" style="height:220px"></div></div>
+<div class="ch"><div class="ch-t">Thailand (THD)</div><div id="reg-thd" style="height:220px"></div></div>
+</div>
+<div class="ch"><div class="ch-t">Philippines (EPHE)</div><div id="reg-ephe" style="height:220px"></div></div>
+<div class="sec" style="font-size:14px">Correlation by Regime</div>
+<div id="reg-corr"></div>
+<div class="box" style="font-size:11px;margin-top:8px">Data from <code>MON.regional</code>. If unavailable, add regional ETF price series to the build pipeline. Schema: <code>{etf: {ticker, fwdByScore: {score: {rets:[], mdds:[]}}, corrByRegime: {low, high}}}</code></div>
+</div>
 <div class="pnl" id="t-rsk"><div class="sec">Risk-Adjusted Metrics</div><div class="g g4" id="rsk-cards"></div><div class="g g2"><div class="ch"><div class="ch-t">Monthly Returns — Composite</div><div id="ch-mdist" style="height:220px"></div></div><div class="ch"><div class="ch-t">Rolling 12M Sharpe</div><div id="ch-rshp" style="height:220px"></div></div></div></div>
 <div class="pnl" id="t-qc"><div class="sec">Quality Control</div><div class="qc"><h3>Validation</h3><div id="qc-chk"></div></div><div class="sec" style="font-size:14px">Data</div><div class="cd" id="qc-data"></div><div class="sec" style="font-size:14px">Backtest</div><div class="cd" id="qc-bt"></div><div class="sec" style="font-size:14px">Statistics</div><div class="cd" id="qc-st"></div></div>
 
@@ -252,6 +318,50 @@ var vxCol=!vxHasData?'#8e95a5':vxI?'#dc2626':vxRaw?'#b45309':vxR>0.95?'#b45309':
 var vxNote=!vxHasData?'No VIX data available':vxI?'⚠ CONFIRMED INVERTED (3 consecutive days >1.0)':vxRaw?'⚠ Inverted today — awaiting 3-day confirmation':vxR>0.95?'⚠ Ratio '+vxR.toFixed(3)+' — approaching inversion':'Contango — normal term structure';
 sigHtml+=rangeBar('VIX Term Structure','VIX/VIX3M ratio — 3 consecutive days above 1.0 triggers signal',vxR!=null?vxR.toFixed(3)+' (threshold: 1.000)':'No data',vxDot,vxThPct,'linear-gradient(90deg, #15803d 0%, #65a30d 30%, #b45309 50%, #dc2626 60%, #7f1d1d 100%)',vxNote,vxCol);
 $('#mon-sig').innerHTML=sigHtml;
+
+// Signal Dashboard — compact 6-pill grid
+var signals=[
+  {n:'Stress 8D',v:last.rolling8d,th:'≥115',on:ba,warn:last.rolling8d>80},
+  {n:'200d MA',v:(ma2pct*100).toFixed(1)+'%',th:'Below',on:b2,warn:Math.abs(ma2pct)<0.03},
+  {n:'Canary',v:last.canaryBad+'/'+last.canaryTotal,th:'≥1',on:cb,warn:false},
+  {n:'12M Mom',v:pct(last.spy12mRet,0),th:'<0%',on:sn,warn:m12val<3&&!sn},
+  {n:'10M SMA',v:(ma10pct*100).toFixed(1)+'%',th:'Below',on:b10,warn:Math.abs(ma10pct)<0.03},
+  {n:'VIX Term',v:vxR!=null?vxR.toFixed(2):'—',th:'>1.0 3d',on:vxI,warn:vxRaw||vxR>0.95}
+];
+$('#sig-dashboard').innerHTML=signals.map(function(s){
+  var cls=s.on?'on-r':s.warn?'on-a':'on-g';
+  var icon=s.on?'▲':'✓';
+  return '<div class="sig-pill '+cls+'"><div class="sig-pill-name">'+s.n+'</div><div class="sig-pill-val">'+s.v+'</div><div class="sig-pill-note">'+(s.on?'TRIGGERED':s.warn?'WATCH':'Clear')+'</div></div>';
+}).join('');
+
+// CIO Narrative — auto-generated "What to Watch"
+var prevScore=R.length>=6?R[R.length-6].compositeScore:cs;
+var scoreDir=cs>prevScore?'deteriorated':cs<prevScore?'improved':'unchanged';
+var activeSigs=signals.filter(function(s){return s.on}).map(function(s){return s.n});
+var warnSigs=signals.filter(function(s){return s.warn&&!s.on}).map(function(s){return s.n});
+var cioHtml='<div class="cio-box" style="border-color:'+(cs>=3?'var(--red)':cs>=2?'var(--amb)':'var(--grn)')+';background:'+(cs>=3?'var(--red-bg)':cs>=2?'var(--amb-bg)':'var(--grn-bg)')+'">';
+cioHtml+='<h4>'+rl+' — What to Watch</h4>';
+if(cs===0){
+  cioHtml+='<p>All six signals are clear. No defensive positioning required. Maintain full equity exposure. ';
+  if(warnSigs.length)cioHtml+='Monitor '+warnSigs.join(', ')+' — approaching threshold. ';
+  cioHtml+='</p>';
+} else if(cs<=2){
+  cioHtml+='<p>Score has '+scoreDir+' to <strong>'+cs+'/6</strong> over the past week. ';
+  cioHtml+='Active signals: <strong>'+activeSigs.join(', ')+'</strong>. ';
+  if(warnSigs.length)cioHtml+='Near threshold: '+warnSigs.join(', ')+'. ';
+  cioHtml+='Consider reducing gross exposure or adding tail hedges if score rises further. ';
+  cioHtml+='At current level, graduated allocation is '+ra.toLowerCase()+'. ';
+  cioHtml+='</p>';
+} else {
+  cioHtml+='<p>Score has '+scoreDir+' to <strong>'+cs+'/6</strong>. ';
+  cioHtml+='<strong>'+activeSigs.length+' of 6 signals active</strong>: '+activeSigs.join(', ')+'. ';
+  cioHtml+='Historical episodes at this score show elevated drawdown risk (see episode analysis below). ';
+  cioHtml+='Allocation: <strong>'+ra+'</strong>. ';
+  if(cs>=4)cioHtml+='Full defensive posture. Review regional portfolios — US stress typically spills over to EM/Asia with 1–4 week lag. ';
+  cioHtml+='</p>';
+}
+cioHtml+='</div>';
+$('#cio-narrative').innerHTML=cioHtml;
 
 // Regime context
 var rd=MON.regimeDays||0;
@@ -506,6 +616,192 @@ var ah=MON.allocHist||[];
 if(ah.length>0){Plotly.newPlot('ch-ahist',[{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.spy}),type:'scatter',fill:'tozeroy',name:'SPY%',line:{color:'#2563eb',width:0},fillcolor:'rgba(37,99,235,.25)'},{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.ief}),type:'scatter',name:'IEF%',line:{color:'#15803d',width:1},fillcolor:'rgba(22,163,74,.1)'}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,105]})}),PC)}
 
 Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]})}),PC);
+
+// === INDICATORS TAB ===
+// Status strip — compact signal state summary
+$('#ind-status-strip').innerHTML=signals.map(function(s){
+  var cls=s.on?'on-r':s.warn?'on-a':'on-g';
+  return '<div class="sig-pill '+cls+'"><div class="sig-pill-name">'+s.n+'</div><div class="sig-pill-val">'+s.v+'</div><div class="sig-pill-note">'+(s.on?'ACTIVE':s.warn?'WATCH':'OK')+'</div></div>';
+}).join('');
+
+// Range button handler — relayout all indicator charts
+var indChartIds=['ind-score','ind-ma200','ind-8d','ind-12m','ind-canary','ind-sma10','ind-vix'];
+var indRange=252;// default 1Y
+$$('#ind-range-btns .ind-range-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    $$('#ind-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
+    btn.classList.add('on');
+    indRange=parseInt(btn.dataset.range);
+    var startDate=indRange>0?R[Math.max(0,R.length-indRange)].date:R[0].date;
+    var endDate=last.date;
+    indChartIds.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el&&el.data)Plotly.relayout(id,{'xaxis.range':[startDate,endDate]});
+    });
+  });
+});
+
+function shadeRegions(dates,cond,color){
+  var shapes=[];var inRegion=false,start=null;
+  for(var i=0;i<dates.length;i++){
+    if(cond[i]&&!inRegion){inRegion=true;start=dates[i];}
+    if(!cond[i]&&inRegion){inRegion=false;shapes.push({type:'rect',xref:'x',yref:'paper',x0:start,x1:dates[i],y0:0,y1:1,fillcolor:color,line:{width:0}});}
+  }
+  if(inRegion)shapes.push({type:'rect',xref:'x',yref:'paper',x0:start,x1:dates[dates.length-1],y0:0,y1:1,fillcolor:color,line:{width:0}});
+  return shapes;
+}
+var iDates=R.map(function(r){return r.date});
+function indLayout(extra,sh){
+  var l=Object.assign({},PL());
+  if(sh)l.shapes=sh;
+  if(extra)Object.assign(l,extra);
+  return l;
+}
+
+// 1) Composite Score
+Plotly.newPlot('ind-score',[
+  {x:iDates,y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:lw},fillcolor:'rgba(220,38,38,.08)',name:'Score'},
+  {x:[iDates[0],iDates[iDates.length-1]],y:[2,2],type:'scatter',mode:'lines',name:'\u22652 Def',line:{color:'#b45309',width:1,dash:'dash'}}
+],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]})},shadeRegions(iDates,R.map(function(r){return r.compositeScore>=2}),'rgba(220,38,38,0.06)')),PC);
+
+// 2) SPX vs 200-Day MA
+var ma200D=R.filter(function(r){return r.sma200!=null});
+Plotly.newPlot('ind-ma200',[
+  {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPX',line:{color:'#2563eb',width:lw}},
+  {x:ma200D.map(function(r){return r.date}),y:ma200D.map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1.5,dash:'dot'}}
+],indLayout({yaxis:Object.assign({},PL().yaxis,{type:'log'})},shadeRegions(iDates,R.map(function(r){return r.sma200!=null&&r.spx<r.sma200}),'rgba(220,38,38,0.06)')),PC);
+
+// 3) 8-Day Stress Count
+Plotly.newPlot('ind-8d',[
+  {x:iDates,y:R.map(function(r){return r.rolling8d}),type:'scatter',mode:'lines',name:'8D Count',line:{color:'#b45309',width:lw}},
+  {x:[iDates[0],iDates[iDates.length-1]],y:[115,115],type:'scatter',mode:'lines',name:'\u2265115',line:{color:'#dc2626',width:1.5,dash:'dash'}}
+],indLayout(null,shadeRegions(iDates,R.map(function(r){return r.rolling8d>=115}),'rgba(220,38,38,0.06)')),PC);
+
+// 4) SPY 12-Month Return
+var has12m=R.filter(function(r){return r.spy12mRet!=null});
+if(has12m.length>0){
+  Plotly.newPlot('ind-12m',[
+    {x:has12m.map(function(r){return r.date}),y:has12m.map(function(r){return (r.spy12mRet||0)*100}),type:'scatter',mode:'lines',name:'SPY 12M %',line:{color:'#2563eb',width:lw},fill:'tozeroy',fillcolor:'rgba(37,99,235,0.05)'},
+    {x:[has12m[0].date,has12m[has12m.length-1].date],y:[0,0],type:'scatter',mode:'lines',name:'0%',line:{color:'#888',width:1.5}}
+  ],indLayout({yaxis:Object.assign({},PL().yaxis,{ticksuffix:'%'})},shadeRegions(has12m.map(function(r){return r.date}),has12m.map(function(r){return r.spy12mNeg}),'rgba(220,38,38,0.06)')),PC);
+} else {$('#ind-12m').innerHTML='<div style="padding:20px;color:#999;text-align:center">12M return data not in rolling series</div>';}
+
+// 5) Canary Assets
+var hasCan=R.filter(function(r){return r.canaryBad!=null});
+if(hasCan.length>0){
+  Plotly.newPlot('ind-canary',[
+    {x:hasCan.map(function(r){return r.date}),y:hasCan.map(function(r){return r.canaryBad}),type:'scatter',mode:'lines',name:'# Negative',line:{color:'#7c3aed',width:lw},fill:'tozeroy',fillcolor:'rgba(124,58,237,0.08)'},
+    {x:[hasCan[0].date,hasCan[hasCan.length-1].date],y:[1,1],type:'scatter',mode:'lines',name:'\u22651',line:{color:'#dc2626',width:1,dash:'dash'}}
+  ],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[-0.2,2.5],dtick:1})},shadeRegions(hasCan.map(function(r){return r.date}),hasCan.map(function(r){return r.canaryBad>=1}),'rgba(220,38,38,0.06)')),PC);
+} else {$('#ind-canary').innerHTML='<div style="padding:20px;color:#999;text-align:center">Canary data not in rolling series</div>';}
+
+// 6) 10-Month SMA
+var hasSMA10=R.filter(function(r){return r.sma10m!=null});
+if(hasSMA10.length>0){
+  Plotly.newPlot('ind-sma10',[
+    {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPX',line:{color:'#2563eb',width:lw}},
+    {x:hasSMA10.map(function(r){return r.date}),y:hasSMA10.map(function(r){return r.sma10m}),type:'scatter',mode:'lines',name:'10M SMA',line:{color:'#15803d',width:1.5,dash:'dot'}}
+  ],indLayout({yaxis:Object.assign({},PL().yaxis,{type:'log'})},shadeRegions(iDates,R.map(function(r){return r.belowSMA10m}),'rgba(220,38,38,0.06)')),PC);
+} else {$('#ind-sma10').innerHTML='<div style="padding:20px;color:#999;text-align:center">10M SMA data not in rolling series</div>';}
+
+// 7) VIX Term Structure
+var hasVix=R.filter(function(r){return r.vixRatio!=null});
+if(hasVix.length>0){
+  Plotly.newPlot('ind-vix',[
+    {x:hasVix.map(function(r){return r.date}),y:hasVix.map(function(r){return r.vixRatio}),type:'scatter',mode:'lines',name:'VIX/VIX3M',line:{color:'#9b59b6',width:lw}},
+    {x:[hasVix[0].date,hasVix[hasVix.length-1].date],y:[1,1],type:'scatter',mode:'lines',name:'1.0',line:{color:'#dc2626',width:1.5,dash:'dash'}}
+  ],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[0.7,1.4]})},shadeRegions(hasVix.map(function(r){return r.date}),hasVix.map(function(r){return r.vixInverted}),'rgba(220,38,38,0.06)')),PC);
+} else {$('#ind-vix').innerHTML='<div style="padding:20px;color:#999;text-align:center">VIX data not in rolling series</div>';}
+
+
+// === REGIONAL TAB ===
+var REG=MON.regional||{};
+var regETFs=[
+  {k:'mchi',n:'MCHI',l:'China',c:'#dc2626',chartId:'reg-mchi'},
+  {k:'ews',n:'EWS',l:'Singapore',c:'#2563eb',chartId:'reg-ews'},
+  {k:'ewm',n:'EWM',l:'Malaysia',c:'#15803d',chartId:'reg-ewm'},
+  {k:'eido',n:'EIDO',l:'Indonesia',c:'#b45309',chartId:'reg-eido'},
+  {k:'thd',n:'THD',l:'Thailand',c:'#7c3aed',chartId:'reg-thd'},
+  {k:'ephe',n:'EPHE',l:'Philippines',c:'#0891b2',chartId:'reg-ephe'}
+];
+
+if(REG&&Object.keys(REG).length>0){
+  // Summary cards
+  var regSumHtml='';
+  regETFs.forEach(function(etf){
+    var d=REG[etf.k];if(!d)return;
+    var med4w=d.fwdByScore&&d.fwdByScore[cs]?saMed2(d.fwdByScore[cs].rets||[]):null;
+    var mdd4w=d.fwdByScore&&d.fwdByScore[cs]?saMean2(d.fwdByScore[cs].mdds||[]):null;
+    regSumHtml+='<div class="reg-card"><div class="reg-card-name">'+etf.n+' · '+etf.l+'</div><div class="reg-card-val '+(med4w!=null?(med4w>=0?'pos':'neg'):'')+'">'+pct(med4w)+'</div><div class="cd-s">4W med at Score '+cs+(mdd4w!=null?' · MDD '+pct(mdd4w):'')+'</div></div>';
+  });
+  $('#reg-summary').innerHTML=regSumHtml;
+
+  // Regional charts: box plots by score (same framework as SPX episodes)
+  regETFs.forEach(function(etf){
+    var d=REG[etf.k];
+    if(!d||!d.fwdByScore){$('#'+etf.chartId).innerHTML='<div style="padding:20px;color:#999;text-align:center">No data for '+etf.n+'</div>';return;}
+    var traces=[],annotations=[],shapes=[];
+    var scores=Object.keys(d.fwdByScore).map(Number).sort();
+    var yLabels=scores.map(function(s){return 'Score '+s}).reverse();
+    scores.slice().reverse().forEach(function(sc){
+      var sd=d.fwdByScore[sc];if(!sd||!sd.rets||sd.rets.length<2)return;
+      var vals=sd.rets.map(function(v){return v*100});
+      var med=saMed2(sd.rets)*100;
+      traces.push({type:'box',x:vals,y:vals.map(function(){return 'Score '+sc}),
+        orientation:'h',showlegend:false,boxpoints:false,
+        line:{color:etf.c,width:M?1:1.5},fillcolor:etf.c+'33',
+        whiskerwidth:0.4,hoveron:'boxes',
+        hovertemplate:'Score '+sc+'<br>Med: '+(med>=0?'+':'')+med.toFixed(1)+'%<extra></extra>'});
+      annotations.push({x:med,y:'Score '+sc,text:'<b>'+(med>=0?'+':'')+med.toFixed(1)+'%</b>',
+        showarrow:false,font:{size:M?8:9,color:med>=0?'#15803d':'#dc2626'},yshift:-14});
+    });
+    shapes.push({type:'line',x0:0,x1:0,y0:0,y1:1,xref:'x',yref:'y domain',line:{color:'#888',width:1.5}});
+    Plotly.newPlot(etf.chartId,traces,Object.assign({},PL(),{
+      shapes:shapes,annotations:annotations,
+      margin:{t:8,r:M?10:16,b:M?20:30,l:M?54:70},
+      height:Math.max(160,scores.length*38+40),
+      yaxis:Object.assign({},PL().yaxis,{categoryorder:'array',categoryarray:yLabels,showgrid:false})
+    }),PC);
+  });
+
+  // Regional narrative
+  var regNarr='<div class="cio-box" style="border-color:var(--blu);background:var(--blu-bg)"><h4>Regional Implications at Score '+cs+'</h4><p>';
+  if(cs<=1){
+    regNarr+='US risk signals are benign. Regional equities typically follow their own macro drivers at this level. No US-driven defensive action needed for China/ASEAN books.';
+  } else if(cs<=3){
+    regNarr+='Moderate US stress. Historically, MCHI shows wider dispersion than SPX at this score level — China equities can decouple both positively (policy stimulus) and negatively (contagion). ';
+    regNarr+='ASEAN (EWS, EWM, EIDO) typically lags US stress by 1–3 weeks. Consider reducing gross on high-beta ASEAN names (EIDO, THD) before low-vol names (EWS).';
+  } else {
+    regNarr+='<strong>Elevated US stress — spillover risk is high.</strong> At Score 4+, cross-asset correlations historically spike. ';
+    regNarr+='MCHI and EIDO tend to see the largest drawdowns among regional ETFs during US stress episodes. ';
+    regNarr+='EWS (Singapore) historically shows more resilience due to SGD strength and defensive sector composition. ';
+    regNarr+='Consider: (a) reduce MCHI gross, (b) trim high-beta ASEAN, (c) relative value shift toward EWS, (d) hedge CNH/IDR exposure.';
+  }
+  regNarr+='</p></div>';
+  $('#reg-narrative').innerHTML=regNarr;
+
+  // Correlation by regime
+  if(REG.correlations){
+    var corrHtml='<div style="overflow-x:auto"><table><thead><tr><th>ETF</th><th>Score 0–1 (β)</th><th>Score 2–3 (β)</th><th>Score 4+ (β)</th></tr></thead><tbody>';
+    regETFs.forEach(function(etf){
+      var c=REG.correlations[etf.k];if(!c)return;
+      corrHtml+='<tr><td><strong>'+etf.n+'</strong> '+etf.l+'</td>';
+      ['low','mid','high'].forEach(function(r){
+        var v=c[r];corrHtml+='<td class="mono '+(v!=null&&v>1.2?'neg':'')+'">'+((v!=null)?v.toFixed(2):'—')+'</td>';
+      });
+      corrHtml+='</tr>';
+    });
+    corrHtml+='</tbody></table></div>';
+    $('#reg-corr').innerHTML=corrHtml;
+  }
+} else {
+  // No regional data — show placeholder with schema instructions
+  $('#reg-summary').innerHTML='<div class="box" style="grid-column:1/-1">Regional data not yet available. Add <code>MON.regional</code> to the build pipeline with the schema described below. Required ETF price series: MCHI, EWS, EWM, EIDO, THD, EPHE.</div>';
+  regETFs.forEach(function(etf){
+    var el=$('#'+etf.chartId);
+    if(el)el.innerHTML='<div style="padding:30px;text-align:center;color:#999">Awaiting '+etf.n+' data in build pipeline</div>';
+  });
+}
 
 // OVERVIEW
 $('#ov-cards').innerHTML=[{t:'B&H CAGR',v:pct(MET.bh.cagr),c:'pos'},{t:'Comp(IEF) CAGR',v:pct(MET.comp.cagr),c:MET.comp.cagr>0?'pos':'neg'},{t:'Comp(SHY) CAGR',v:pct(MET.compShy.cagr),c:MET.compShy.cagr>0?'pos':'neg'},{t:'B&H Max DD',v:pct(MET.bh.maxDD),c:'neg'},{t:'Comp(IEF) DD',v:pct(MET.comp.maxDD),c:'neg'},{t:'Comp(SHY) DD',v:pct(MET.compShy.maxDD),c:'neg'}].map(function(c){return '<div class="cd"><div class="cd-t">'+c.t+'</div><div class="cd-v '+c.c+'">'+c.v+'</div></div>'}).join('');
