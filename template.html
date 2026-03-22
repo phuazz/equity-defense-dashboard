@@ -553,27 +553,31 @@ function buildPanel(episodes,chartId,noteId,direction){
 
       // Score 0 baseline gets a distinct muted style
       var isBase=sc===0&&direction==='det';
+      var isCurrent=sc===cs;
       var bColor=isBase?'rgba(140,149,165,':baseColor;
       var bFill=isBase?0.15:fillAlpha;
+      var lineW=isCurrent?(M?2:2.5):(M?1:1.5);
+      var lineA=isCurrent?'0.9)':'0.7)';
+      if(isCurrent&&!isBase)bFill=Math.min(bFill*1.6,0.55);
 
       if(nObs>=5){
         // Full box plot for adequate sample sizes
         traces.push({type:'box',x:vals,y:vals.map(function(){return yLabel}),
           orientation:'h',xaxis:xAxis,yaxis:yAxis,
           name:saScoreLabels[sc],showlegend:false,boxpoints:false,
-          line:{color:bColor+'0.7)',width:M?1:1.5},
+          line:{color:bColor+lineA,width:lineW},
           fillcolor:bColor+bFill+')',
           whiskerwidth:0.4,hoverinfo:'none'});
       } else {
         // Small sample: show individual points instead of box
         traces.push({type:'scatter',x:vals,y:vals.map(function(){return yLabel}),
           mode:'markers',xaxis:xAxis,yaxis:yAxis,
-          marker:{color:bColor+'0.5)',size:M?5:7,symbol:'circle'},
+          marker:{color:bColor+'0.5)',size:isCurrent?(M?7:9):(M?5:7),symbol:'circle'},
           showlegend:false,hoverinfo:'none'});
       }
 
       // Hover tooltip — adapt stats by sample size
-      var hoverText=saScoreLabels[sc]+(isBase?' (baseline)':'');
+      var hoverText=saScoreLabels[sc]+(isBase?' (baseline)':(isCurrent?' ◄ CURRENT':''));
       hoverText+='<br>Median: '+(medV>=0?'+':'')+medV.toFixed(1)+'%';
       if(nObs>=5)hoverText+='<br>IQR: '+p25.toFixed(1)+'% to '+(p75>=0?'+':'')+p75.toFixed(1)+'%';
       if(nObs>=2)hoverText+='<br>Range: '+mn.toFixed(1)+'% to '+(mx>=0?'+':'')+mx.toFixed(1)+'%';
@@ -586,12 +590,18 @@ function buildPanel(episodes,chartId,noteId,direction){
         showlegend:false,
         hovertemplate:hoverText+'<extra></extra>'});
 
-      // Median annotation
+      // Median annotation — larger font for current score
       annotations.push({x:medV,y:yLabel,xref:xAxis,yref:yAxis,
         text:'<b>'+(dp.med>=0?'+':'')+(medV).toFixed(1)+'%</b>',
         showarrow:false,
-        font:{size:M?8:9,color:isBase?'#555':(isDD?'#991b1b':(dp.med>=0?'#15803d':'#b91c1c'))},
+        font:{size:isCurrent?(M?9:11):(M?8:9),color:isBase?'#555':(isDD?'#991b1b':(dp.med>=0?'#15803d':'#b91c1c'))},
         yshift:M?-13:-15});
+      // "NOW" marker on first panel
+      if(isCurrent&&pi===0){
+        annotations.push({x:1,y:yLabel,xref:xAxis+' domain',yref:yAxis,
+          text:'<b>◄ NOW</b>',showarrow:false,
+          font:{size:M?8:9,color:cs>=3?'#dc2626':'#b45309'},xshift:M?2:4});
+      }
     });
   });
 
@@ -754,79 +764,154 @@ var regETFs=[
   {k:'thd',n:'THD',l:'Thailand',c:'#7c3aed'},
   {k:'ephe',n:'EPHE',l:'Philippines',c:'#0891b2'}
 ];
+var regHorizons=['1W','4W','12W'];
 
-if(REG&&Object.keys(REG).length>0){
-  // Build full regional content
-  var rHtml='<div class="box">How do US risk regime changes affect China and ASEAN equities? Episode-based forward returns and drawdowns by US composite score level.</div>';
-  rHtml+='<div id="reg-summary" class="sa" style="margin:10px 0"></div>';
-  rHtml+='<div id="reg-narrative"></div>';
-  rHtml+='<div class="sec" style="font-size:14px">China — MCHI</div>';
-  rHtml+='<div class="ch"><div class="ch-t">MCHI Forward Returns by US Score Deterioration</div><div id="reg-mchi" style="height:260px"></div></div>';
-  rHtml+='<div class="sec" style="font-size:14px">ASEAN</div>';
-  rHtml+='<div class="g g2">';
-  rHtml+='<div class="ch"><div class="ch-t">Singapore (EWS)</div><div id="reg-ews" style="height:220px"></div></div>';
-  rHtml+='<div class="ch"><div class="ch-t">Malaysia (EWM)</div><div id="reg-ewm" style="height:220px"></div></div>';
-  rHtml+='<div class="ch"><div class="ch-t">Indonesia (EIDO)</div><div id="reg-eido" style="height:220px"></div></div>';
-  rHtml+='<div class="ch"><div class="ch-t">Thailand (THD)</div><div id="reg-thd" style="height:220px"></div></div>';
+if(REG&&Object.keys(REG).length>0&&Object.keys(REG).some(function(k){return k!=='correlations'})){
+  // Build full regional content with score banner
+  var rHtml='';
+  // Score banner — current state for context
+  rHtml+='<div class="regime '+(cs>=4?'r-d':cs>=2?'r-w':'r-s')+'" style="padding:12px 16px;margin:8px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  rHtml+='<div style="font-family:IBM Plex Mono;font-size:28px;font-weight:700">'+cs+'/6</div>';
+  rHtml+='<div><div style="font-weight:700;font-size:14px">'+rl+'</div><div style="font-size:12px;color:var(--t2)">Current US composite score — '+last.date+'</div></div></div>';
+
+  rHtml+='<div class="box">Episode-based analysis: when the US composite score deteriorates to a given level, what are the 1W, 4W, and 12W forward returns and drawdowns for regional ETF proxies? Score 0 row = baseline.</div>';
+
+  // Summary cards — show 4W return + 12W return + 4W MDD at current score
+  rHtml+='<div class="sa" style="margin:10px 0">';
+  regETFs.forEach(function(etf){
+    var d=REG[etf.k];if(!d||!d.fwdByScore)return;
+    var sd=d.fwdByScore[cs];
+    var med4w=sd&&sd['4W']?saMed2(sd['4W'].rets||[]):null;
+    var med12w=sd&&sd['12W']?saMed2(sd['12W'].rets||[]):null;
+    var mdd4w=sd&&sd['4W']?saMean2(sd['4W'].mdds||[]):null;
+    rHtml+='<div class="reg-card"><div class="reg-card-name">'+etf.n+' · '+etf.l+'</div>';
+    rHtml+='<div class="reg-card-val '+(med4w!=null?(med4w>=0?'pos':'neg'):'')+'">'+pct(med4w)+'</div>';
+    rHtml+='<div class="cd-s">4W med at Score '+cs+'</div>';
+    rHtml+='<div style="font-size:11px;color:var(--t2);margin-top:2px">';
+    if(med12w!=null)rHtml+='12W: <span class="'+(med12w>=0?'pos':'neg')+'">'+pct(med12w)+'</span> · ';
+    if(mdd4w!=null)rHtml+='MDD 4W: <span class="neg">'+pct(mdd4w)+'</span>';
+    rHtml+='</div></div>';
+  });
   rHtml+='</div>';
-  rHtml+='<div class="ch"><div class="ch-t">Philippines (EPHE)</div><div id="reg-ephe" style="height:220px"></div></div>';
-  rHtml+='<div class="sec" style="font-size:14px">Correlation by Regime</div>';
+
+  rHtml+='<div id="reg-narrative"></div>';
+
+  // Charts: one per ETF with multi-horizon box plots (2 rows: returns + MDD, 3 cols: 1W/4W/12W)
+  regETFs.forEach(function(etf){
+    var d=REG[etf.k];if(!d||!d.fwdByScore)return;
+    rHtml+='<div class="ch"><div class="ch-t">'+etf.n+' — '+etf.l+' (returns top, MDD bottom)</div><div id="reg-'+etf.k+'" style="height:'+(M?'360':'320')+'px"></div></div>';
+  });
+
+  rHtml+='<div class="sec" style="font-size:14px">Beta to SPX by Regime</div>';
   rHtml+='<div id="reg-corr"></div>';
+
   $('#reg-content').innerHTML=rHtml;
 
-  // Summary cards
-  var regSumHtml='';
-  regETFs.forEach(function(etf){
-    var d=REG[etf.k];if(!d)return;
-    var med4w=d.fwdByScore&&d.fwdByScore[cs]?saMed2(d.fwdByScore[cs].rets||[]):null;
-    var mdd4w=d.fwdByScore&&d.fwdByScore[cs]?saMean2(d.fwdByScore[cs].mdds||[]):null;
-    regSumHtml+='<div class="reg-card"><div class="reg-card-name">'+etf.n+' · '+etf.l+'</div><div class="reg-card-val '+(med4w!=null?(med4w>=0?'pos':'neg'):'')+'">'+pct(med4w)+'</div><div class="cd-s">4W med at Score '+cs+(mdd4w!=null?' · MDD '+pct(mdd4w):'')+'</div></div>';
-  });
-  $('#reg-summary').innerHTML=regSumHtml;
-
-  // Charts
+  // Render charts
   regETFs.forEach(function(etf){
     var d=REG[etf.k];var el=$('#reg-'+etf.k);
     if(!d||!d.fwdByScore||!el)return;
-    var traces=[],annotations=[],shapes=[];
     var scores=Object.keys(d.fwdByScore).map(Number).sort();
     var yLabels=scores.map(function(s){return 'Score '+s}).reverse();
-    scores.slice().reverse().forEach(function(sc){
-      var sd=d.fwdByScore[sc];if(!sd||!sd.rets||sd.rets.length<2)return;
-      var vals=sd.rets.map(function(v){return v*100});
-      var med=saMed2(sd.rets)*100;
-      traces.push({type:'box',x:vals,y:vals.map(function(){return 'Score '+sc}),
-        orientation:'h',showlegend:false,boxpoints:false,
-        line:{color:etf.c,width:M?1:1.5},fillcolor:etf.c+'33',
-        whiskerwidth:0.4,hoverinfo:'none'});
-      traces.push({type:'scatter',x:[med],y:['Score '+sc],mode:'markers',
-        marker:{color:'rgba(0,0,0,0)',size:20},showlegend:false,
-        hovertemplate:etf.n+' at Score '+sc+'<br>Median: '+(med>=0?'+':'')+med.toFixed(1)+'%<extra></extra>'});
-      annotations.push({x:med,y:'Score '+sc,text:'<b>'+(med>=0?'+':'')+med.toFixed(1)+'%</b>',
-        showarrow:false,font:{size:M?8:9,color:med>=0?'#15803d':'#dc2626'},yshift:-14});
+    // 6 panels: top row = 1W/4W/12W returns, bottom row = 1W/4W/12W MDD
+    var panelList=M?
+      [{h:'4W',t:'ret',l:'4W Return'},{h:'4W',t:'mdd',l:'4W MDD'},{h:'12W',t:'ret',l:'12W Return'},{h:'12W',t:'mdd',l:'12W MDD'}]:
+      [{h:'1W',t:'ret',l:'1W Return'},{h:'4W',t:'ret',l:'4W Return'},{h:'12W',t:'ret',l:'12W Return'},
+       {h:'1W',t:'mdd',l:'1W MDD'},{h:'4W',t:'mdd',l:'4W MDD'},{h:'12W',t:'mdd',l:'12W MDD'}];
+    var nP=panelList.length;
+    var nCols=M?1:3,nRows=M?nP:2;
+    var gapX=0.06,gapY=0.14;
+    var colW4=(1-gapX*(nCols-1))/nCols;
+    var rowH4=(1-gapY*(nRows-1))/nRows;
+    var traces=[],annotations=[],shapes=[];
+
+    panelList.forEach(function(pObj,pi){
+      var xAxis=pi===0?'x':'x'+(pi+1);
+      var yAxis=pi===0?'y':'y'+(pi+1);
+      var isDD=pObj.t==='mdd';
+      var bCol=isDD?'rgba(220,38,38,':'rgba('+parseInt(etf.c.slice(1,3),16)+','+parseInt(etf.c.slice(3,5),16)+','+parseInt(etf.c.slice(5,7),16)+',';
+
+      annotations.push({text:'<b>'+pObj.l+'</b>',x:0.5,y:1.0,
+        xref:xAxis+' domain',yref:yAxis+' domain',
+        showarrow:false,font:{size:M?10:11,color:isDD?'#991b1b':'#444'},yshift:3});
+
+      shapes.push({type:'line',x0:0,x1:0,y0:0,y1:1,
+        xref:xAxis,yref:yAxis+' domain',line:{color:'#888',width:1.5}});
+
+      scores.slice().reverse().forEach(function(sc){
+        var sd=d.fwdByScore[sc];
+        var hd=sd?sd[pObj.h]:null;
+        if(!hd)return;
+        var arr=isDD?hd.mdds:hd.rets;
+        if(!arr||arr.length<2)return;
+        var vals=arr.map(function(v){return v*100});
+        var med=saMed2(arr)*100;
+        var nObs=arr.length;
+        var yLabel='Score '+sc;
+        var isCurrent=sc===cs;
+        var lineW=isCurrent?(M?2:2.5):(M?1:1.5);
+        var fillA=isCurrent?(isDD?'0.4':'0.5'):(isDD?'0.25':'0.3');
+        var lineA=isCurrent?'0.9)':'0.7)';
+
+        if(nObs>=5){
+          traces.push({type:'box',x:vals,y:vals.map(function(){return yLabel}),
+            orientation:'h',xaxis:xAxis,yaxis:yAxis,
+            showlegend:false,boxpoints:false,
+            line:{color:bCol+lineA,width:lineW},
+            fillcolor:bCol+fillA+')',
+            whiskerwidth:0.4,hoverinfo:'none'});
+        } else {
+          traces.push({type:'scatter',x:vals,y:vals.map(function(){return yLabel}),
+            mode:'markers',xaxis:xAxis,yaxis:yAxis,
+            marker:{color:bCol+'0.5)',size:isCurrent?(M?7:9):(M?5:7)},
+            showlegend:false,hoverinfo:'none'});
+        }
+        // Hover
+        var ht=etf.n+' Score '+sc+(isCurrent?' ◄ CURRENT':'')+
+          '<br>'+pObj.l+' Med: '+(med>=0?'+':'')+med.toFixed(1)+'%';
+        if(nObs>=5){var p25=percentile(arr,0.25)*100,p75=percentile(arr,0.75)*100;ht+='<br>IQR: '+p25.toFixed(1)+'% to '+(p75>=0?'+':'')+p75.toFixed(1)+'%';}
+        ht+='<br>N: '+nObs;if(nObs<5)ht+=' <i>(small sample)</i>';
+        traces.push({type:'scatter',x:[med],y:[yLabel],mode:'markers',xaxis:xAxis,yaxis:yAxis,
+          marker:{color:'rgba(0,0,0,0)',size:20},showlegend:false,
+          hovertemplate:ht+'<extra></extra>'});
+        // Median annotation — bold + larger for current score
+        annotations.push({x:med,y:yLabel,xref:xAxis,yref:yAxis,
+          text:'<b>'+(med>=0?'+':'')+med.toFixed(1)+'%</b>',
+          showarrow:false,font:{size:isCurrent?(M?9:10):(M?7:8),color:isDD?'#991b1b':(med>=0?'#15803d':'#b91c1c')},yshift:-13});
+        // "NOW" label on the first panel only for current score
+        if(isCurrent&&pi===0){
+          annotations.push({x:1,y:yLabel,xref:xAxis+' domain',yref:yAxis,
+            text:'<b>◄ NOW</b>',showarrow:false,
+            font:{size:M?8:9,color:cs>=3?'#dc2626':'#b45309'},xshift:M?2:4});
+        }
+      });
     });
-    shapes.push({type:'line',x0:0,x1:0,y0:0,y1:1,xref:'x',yref:'y domain',line:{color:'#888',width:1.5}});
-    Plotly.newPlot('reg-'+etf.k,traces,Object.assign({},PL(),{
-      shapes:shapes,annotations:annotations,
-      margin:{t:8,r:M?10:16,b:M?20:30,l:M?54:70},
-      height:Math.max(160,scores.length*38+40),
-      yaxis:Object.assign({},PL().yaxis,{categoryorder:'array',categoryarray:yLabels,showgrid:false})
-    }),PC);
+
+    var layout={paper_bgcolor:'transparent',plot_bgcolor:'transparent',
+      font:{family:'Source Sans 3',size:M?9:11,color:'#555b6e'},
+      margin:{t:M?18:24,r:M?10:16,b:M?10:14,l:M?54:70},
+      height:M?panelList.length*scores.length*32+panelList.length*40:scores.length*36*2+100,
+      annotations:annotations,shapes:shapes,showlegend:false,hovermode:'closest',dragmode:false};
+    panelList.forEach(function(pObj,pi){
+      var xKey=pi===0?'xaxis':'xaxis'+(pi+1);
+      var yKey=pi===0?'yaxis':'yaxis'+(pi+1);
+      var xAnchor=pi===0?'y':'y'+(pi+1);
+      var yAnchor=pi===0?'x':'x'+(pi+1);
+      var xDomain,yDomain;
+      if(M){var rFrac=(1-0.06*(nP-1))/nP;var rs=1-(pi+1)*rFrac-pi*0.06;xDomain=[0,1];yDomain=[Math.max(0,rs),Math.min(1,rs+rFrac)];}
+      else{var col=pi<3?pi:pi-3;var row=pi<3?0:1;xDomain=[col*(colW4+gapX),col*(colW4+gapX)+colW4];var ys=1-(row+1)*rowH4-row*gapY;yDomain=[Math.max(0,ys),Math.min(1,ys+rowH4)];}
+      layout[xKey]={domain:xDomain,gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?8:10,color:'#888'},zeroline:false,ticksuffix:'%',anchor:xAnchor};
+      layout[yKey]={domain:yDomain,anchor:yAnchor,gridcolor:'#f5f5f5',linecolor:'transparent',tickfont:{size:M?8:10},automargin:true,showgrid:false,categoryorder:'array',categoryarray:yLabels};
+      if(!M&&pi%3!==0)layout[yKey].showticklabels=false;
+    });
+    Plotly.newPlot('reg-'+etf.k,traces,layout,PC);
   });
 
-  // Regional narrative
+  // Narrative
   var regNarr='<div class="cio-box" style="border-color:var(--blu);background:var(--blu-bg)"><h4>Regional Implications at Score '+cs+'</h4><p>';
-  if(cs<=1){
-    regNarr+='US risk signals are benign. Regional equities typically follow their own macro drivers at this level. No US-driven defensive action needed for China/ASEAN books.';
-  } else if(cs<=3){
-    regNarr+='Moderate US stress. Historically, MCHI shows wider dispersion than SPX at this score level — China equities can decouple both positively (policy stimulus) and negatively (contagion). ';
-    regNarr+='ASEAN (EWS, EWM, EIDO) typically lags US stress by 1–3 weeks. Consider reducing gross on high-beta ASEAN names (EIDO, THD) before low-vol names (EWS).';
-  } else {
-    regNarr+='<strong>Elevated US stress — spillover risk is high.</strong> At Score 4+, cross-asset correlations historically spike. ';
-    regNarr+='MCHI and EIDO tend to see the largest drawdowns among regional ETFs during US stress episodes. ';
-    regNarr+='EWS (Singapore) historically shows more resilience due to SGD strength and defensive sector composition. ';
-    regNarr+='Consider: (a) reduce MCHI gross, (b) trim high-beta ASEAN, (c) relative value shift toward EWS, (d) hedge CNH/IDR exposure.';
-  }
+  if(cs<=1){regNarr+='US risk signals are benign. Regional equities typically follow their own macro drivers. No US-driven defensive action needed for China/ASEAN books.';}
+  else if(cs<=3){regNarr+='Moderate US stress. MCHI shows wider dispersion than SPX — China equities can decouple both ways. ASEAN (EWS, EWM, EIDO) typically lags US stress by 1–3 weeks. Consider reducing gross on high-beta ASEAN (EIDO, THD) before low-vol (EWS).';}
+  else{regNarr+='<strong>Elevated US stress — spillover risk is high.</strong> At Score 4+, cross-asset correlations spike. MCHI and EIDO see the largest drawdowns. EWS shows more resilience. Consider: (a) reduce MCHI gross, (b) trim high-beta ASEAN, (c) relative value toward EWS, (d) hedge CNH/IDR.';}
   regNarr+='</p></div>';
   $('#reg-narrative').innerHTML=regNarr;
 
@@ -845,15 +930,13 @@ if(REG&&Object.keys(REG).length>0){
     $('#reg-corr').innerHTML=corrHtml;
   }
 } else {
-  // No regional data — single clean setup message
   var noDataHtml='<div style="text-align:center;padding:40px 20px">';
   noDataHtml+='<div style="font-size:40px;margin-bottom:12px">🌏</div>';
   noDataHtml+='<h3 style="font-family:Source Serif 4,serif;font-size:18px;margin-bottom:8px">Regional Data Not Yet Connected</h3>';
   noDataHtml+='<p style="color:var(--t2);font-size:13px;max-width:500px;margin:0 auto 16px;line-height:1.6">This tab will show how US risk regime changes affect China (MCHI) and ASEAN equities (EWS, EWM, EIDO, THD, EPHE) — including forward returns, drawdowns, and correlations by score level.</p>';
   noDataHtml+='<div class="cd" style="max-width:500px;margin:0 auto;text-align:left;font-size:12px">';
   noDataHtml+='<div class="cd-t">Setup Required</div>';
-  noDataHtml+='<p style="margin:6px 0;color:var(--t2);line-height:1.5">Add <code style="background:var(--sf);padding:1px 4px;border-radius:3px">MON.regional</code> to the build pipeline with daily price series for the regional ETFs. The template will automatically render forward return distributions, correlation tables, and CIO narratives.</p>';
-  noDataHtml+='<p style="margin:6px 0;color:var(--t3);font-size:11px;font-family:IBM Plex Mono,monospace">Schema: {mchi: {fwdByScore: {0: {rets:[], mdds:[]}, ...}}, correlations: {mchi: {low, mid, high}, ...}}</p>';
+  noDataHtml+='<p style="margin:6px 0;color:var(--t2);line-height:1.5">Add regional ETF tickers (MCHI, EWS, EWM, EIDO, THD, EPHE) to EXTRA_TICKERS in compute_signals.py and re-run the pipeline.</p>';
   noDataHtml+='</div></div>';
   $('#reg-content').innerHTML=noDataHtml;
 }
