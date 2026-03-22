@@ -549,34 +549,42 @@ function buildPanel(episodes,chartId,noteId,direction){
       var p75=percentile(dp.raw,0.75)*100;
       var mn=Math.min.apply(null,vals);
       var mx=Math.max.apply(null,vals);
+      var nObs=dp.n;
 
       // Score 0 baseline gets a distinct muted style
       var isBase=sc===0&&direction==='det';
       var bColor=isBase?'rgba(140,149,165,':baseColor;
       var bFill=isBase?0.15:fillAlpha;
 
-      // Box trace — disable built-in hover
-      traces.push({type:'box',x:vals,y:vals.map(function(){return yLabel}),
-        orientation:'h',xaxis:xAxis,yaxis:yAxis,
-        name:saScoreLabels[sc],showlegend:false,boxpoints:false,
-        line:{color:bColor+'0.7)',width:M?1:1.5},
-        fillcolor:bColor+bFill+')',
-        whiskerwidth:0.4,
-        hoverinfo:'none'
-      });
+      if(nObs>=5){
+        // Full box plot for adequate sample sizes
+        traces.push({type:'box',x:vals,y:vals.map(function(){return yLabel}),
+          orientation:'h',xaxis:xAxis,yaxis:yAxis,
+          name:saScoreLabels[sc],showlegend:false,boxpoints:false,
+          line:{color:bColor+'0.7)',width:M?1:1.5},
+          fillcolor:bColor+bFill+')',
+          whiskerwidth:0.4,hoverinfo:'none'});
+      } else {
+        // Small sample: show individual points instead of box
+        traces.push({type:'scatter',x:vals,y:vals.map(function(){return yLabel}),
+          mode:'markers',xaxis:xAxis,yaxis:yAxis,
+          marker:{color:bColor+'0.5)',size:M?5:7,symbol:'circle'},
+          showlegend:false,hoverinfo:'none'});
+      }
 
-      // Invisible scatter at median for clean hover tooltip
+      // Hover tooltip — adapt stats by sample size
+      var hoverText=saScoreLabels[sc]+(isBase?' (baseline)':'');
+      hoverText+='<br>Median: '+(medV>=0?'+':'')+medV.toFixed(1)+'%';
+      if(nObs>=5)hoverText+='<br>IQR: '+p25.toFixed(1)+'% to '+(p75>=0?'+':'')+p75.toFixed(1)+'%';
+      if(nObs>=2)hoverText+='<br>Range: '+mn.toFixed(1)+'% to '+(mx>=0?'+':'')+mx.toFixed(1)+'%';
+      hoverText+='<br>N: '+nObs;
+      if(nObs<5)hoverText+=' <i>(small sample)</i>';
+
       traces.push({type:'scatter',x:[medV],y:[yLabel],
         mode:'markers',xaxis:xAxis,yaxis:yAxis,
         marker:{color:'rgba(0,0,0,0)',size:20},
         showlegend:false,
-        hovertemplate:saScoreLabels[sc]+(isBase?' (baseline)':'')+
-          '<br>Median: '+(medV>=0?'+':'')+medV.toFixed(1)+'%'+
-          '<br>IQR: '+p25.toFixed(1)+'% to '+(p75>=0?'+':'')+p75.toFixed(1)+'%'+
-          '<br>Range: '+mn.toFixed(1)+'% to '+(mx>=0?'+':'')+mx.toFixed(1)+'%'+
-          '<br>N: '+dp.n+
-          '<extra></extra>'
-      });
+        hovertemplate:hoverText+'<extra></extra>'});
 
       // Median annotation
       annotations.push({x:medV,y:yLabel,xref:xAxis,yref:yAxis,
@@ -880,12 +888,15 @@ tr+='<tr style="font-weight:700;border-top:2px solid var(--b)"><td>AVG</td><td><
 tr+='<tr style="font-weight:700"><td>MED</td><td></td><td>'+pct(med('fwd1M'))+'</td><td>'+pct(med('fwd3M'))+'</td><td>'+pct(med('fwd6M'))+'</td><td>'+pct(med('fwd12M'))+'</td><td></td></tr>';
 $('#sig-tbl').innerHTML='<table><thead><tr><th>Date</th><th>8D</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>DD</th></tr></thead><tbody>'+tr+'</tbody></table>';
 var p12=vs.filter(function(s){return s.fwd.fwd12M!=null&&s.fwd.fwd12M>0}).length,t12=vs.filter(function(s){return s.fwd.fwd12M!=null}).length;
-$('#sig-interp').innerHTML='<strong>Summary:</strong> '+p12+'/'+t12+' events ('+(p12/t12*100).toFixed(0)+'%) saw positive 12M returns. Average: '+pct(avg('fwd12M'))+'. Max drawdown: '+pct(aDD)+'. '+(avg('fwd3M')<0?'Short-term pain persists ~3M.':'Recovery begins early.')+' Mean-median spread: '+(Math.abs(avg('fwd12M')-med('fwd12M'))>.05?'wide — outlier-driven.':'tight — consistent.');
+$('#sig-interp').innerHTML='<strong>Summary:</strong> '+p12+'/'+t12+' events'+(t12>0?' ('+(p12/t12*100).toFixed(0)+'%) saw positive 12M returns':'')+'. Average: '+pct(avg('fwd12M'))+'. Max drawdown: '+pct(aDD)+'. '+(avg('fwd3M')<0?'Short-term pain persists ~3M.':'Recovery begins early.')+' Mean-median spread: '+(Math.abs(avg('fwd12M')-med('fwd12M'))>.05?'wide — outlier-driven.':'tight — consistent.');
 Plotly.newPlot('ch-fwd',vs.map(function(s){return{x:Array.from({length:s.fwd.path.length},function(_,j){return j}),y:s.fwd.path.map(function(v){return v*100}),type:'scatter',mode:'lines',name:s.date,line:{width:M?.7:1.2},opacity:.6}}),Object.assign({},PL(),{showlegend:!M}),PC);
 Plotly.newPlot('ch-fdd',[{x:vs.map(function(s){return s.fwd.maxDD12M*100}),type:'histogram',nbinsx:10,marker:{color:'rgba(220,38,38,.5)',line:{color:'#dc2626',width:1}}}],PL(),PC);
 Plotly.newPlot('ch-ath',[{x:SIG.map(function(s){return s.date}),y:SIG.map(function(s){return s.athDist*100}),type:'bar',marker:{color:SIG.map(function(s){return s.athDist>-.05?'#dc2626':'#2563eb'})}}],PL(),PC);
-var dv=vs.map(function(s){return s.fwd.maxDD12M}),dm=dv.reduce(function(a,b){return a+b},0)/dv.length,ds=Math.sqrt(dv.reduce(function(a,v){return a+(v-dm)*(v-dm)},0)/(dv.length-1)),de=ds/Math.sqrt(dv.length);
-$('#sig-stats').innerHTML=[['N',vs.length],['Mean DD',(dm*100).toFixed(1)+'%'],['SE','±'+(de*100).toFixed(1)+'%'],['95% CI','['+((dm-1.96*de)*100).toFixed(1)+'%, '+((dm+1.96*de)*100).toFixed(1)+'%]'],['12M Win',pct(wr('fwd12M'))],['Median 12M',pct(med('fwd12M'))]].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('');
+var dv=vs.map(function(s){return s.fwd.maxDD12M}),dm=dv.reduce(function(a,b){return a+b},0)/dv.length;
+var sigStats=[['N',vs.length],['Mean DD',(dm*100).toFixed(1)+'%']];
+if(dv.length>=3){var ds=Math.sqrt(dv.reduce(function(a,v){return a+(v-dm)*(v-dm)},0)/(dv.length-1)),de=ds/Math.sqrt(dv.length);sigStats.push(['SE','±'+(de*100).toFixed(1)+'%']);if(dv.length>=10){sigStats.push(['95% CI','['+((dm-1.96*de)*100).toFixed(1)+'%, '+((dm+1.96*de)*100).toFixed(1)+'%]'])}else{sigStats.push(['95% CI','N<10 — use with caution'])}}
+sigStats.push(['12M Win',pct(wr('fwd12M'))],['Median 12M',pct(med('fwd12M'))]);
+$('#sig-stats').innerHTML=sigStats.map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('');
 }
 
 // EVENTS — Defensive Trade Log
@@ -989,7 +1000,7 @@ $('#qc-chk').innerHTML=QC.map(function(c){return '<div class="qi"><span><strong>
 $('#qc-data').innerHTML=[['Stocks',(AD.meta?AD.meta.stockCount:90)+'/90'],['Data','Adj Close (total return)'],['Pipeline','GitHub Actions (daily)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
 $('#qc-bt').innerHTML=[['Execution','Stress T+1, VIX T+1 (3-day confirm), Regime T+0'],['Defensive','IEF (7-10Y UST)'],['Tx Costs','5bps per allocation change'],['Strategies','6 (Enh, Faber, DM, VIX, Comp, B&H)'],['Composite','6 sub-signals (VIX requires 3 consecutive days)']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span>'+p[1]+'</span></div>'}).join('');
 var vs2=SIG.filter(function(s){return s.fwd&&s.fwd.maxDD12M!=null});
-if(vs2.length>0){var dv2=vs2.map(function(s){return s.fwd.maxDD12M}),dm2=dv2.reduce(function(a,b){return a+b},0)/dv2.length,ds2=Math.sqrt(dv2.reduce(function(a,v){return a+(v-dm2)*(v-dm2)},0)/(dv2.length-1)),de2=ds2/Math.sqrt(dv2.length);$('#qc-st').innerHTML=[['N',SIG.length],['Avg fwd DD',(dm2*100).toFixed(1)+'% ±'+(de2*100).toFixed(1)+'%'],['95% CI','['+((dm2-1.96*de2)*100).toFixed(1)+'%, '+((dm2+1.96*de2)*100).toFixed(1)+'%]']].map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('')}
+if(vs2.length>0){var dv2=vs2.map(function(s){return s.fwd.maxDD12M}),dm2=dv2.reduce(function(a,b){return a+b},0)/dv2.length;var qcStats=[['N',SIG.length],['Avg fwd DD',(dm2*100).toFixed(1)+'%']];if(dv2.length>=3){var ds2=Math.sqrt(dv2.reduce(function(a,v){return a+(v-dm2)*(v-dm2)},0)/(dv2.length-1)),de2=ds2/Math.sqrt(dv2.length);qcStats.push(['SE','±'+(de2*100).toFixed(1)+'%']);qcStats.push(['95% CI',dv2.length>=10?'['+((dm2-1.96*de2)*100).toFixed(1)+'%, '+((dm2+1.96*de2)*100).toFixed(1)+'%]':'N<10'])}$('#qc-st').innerHTML=qcStats.map(function(p){return '<div class="qi"><span>'+p[0]+'</span><span class="mono">'+p[1]+'</span></div>'}).join('')}
 }
 
 // TABS
