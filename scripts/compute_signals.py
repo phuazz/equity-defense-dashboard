@@ -804,7 +804,8 @@ REGIONAL_HORIZONS = {"1W": 5, "4W": 21, "12W": 63}
 
 def compute_regional(all_data: dict, rolling: list) -> dict:
     """
-    Compute forward returns & drawdowns for regional ETFs by US score deterioration episode.
+    Compute forward returns & drawdowns for regional ETFs by US score episode.
+    Both deterioration (score rises) and improvement (score falls) episodes.
     Multiple horizons (1W, 4W, 12W) to match Monitor tab structure.
     Also computes beta-to-SPX by regime (low/mid/high score).
     """
@@ -823,36 +824,34 @@ def compute_regional(all_data: dict, rolling: list) -> dict:
         for d, p in zip(spy_data["dates"], spy_data["adjCloses"]):
             spy_date_price[d] = p
 
-    episodes = {s: [] for s in range(7)}
+    # Deterioration episodes (score rises to N from lower)
+    det_episodes = {s: [] for s in range(7)}
+    imp_episodes = {s: [] for s in range(7)}
     for i in range(1, len(rolling)):
         cur = rolling[i]["compositeScore"]
         prev = rolling[i - 1]["compositeScore"]
         if cur > prev:
-            episodes[cur].append(i)
+            det_episodes[cur].append(i)
+        if cur < prev:
+            imp_episodes[cur].append(i)
 
+    # Score 0 baseline for deterioration panel
     s0_indices = [i for i, r in enumerate(rolling) if r["compositeScore"] == 0]
-    episodes[0] = s0_indices[::21] if len(s0_indices) > 50 else s0_indices
+    det_episodes[0] = s0_indices[::21] if len(s0_indices) > 50 else s0_indices
 
-    result = {}
-
-    for key, ticker in available.items():
-        etf = all_data[ticker]
-        etf_prices = {d: p for d, p in zip(etf["dates"], etf["adjCloses"])}
-
+    def _compute_fwd(etf_prices, episodes_dict):
+        """Compute forward returns by score for a given set of episodes."""
         fwd_by_score = {}
-        for score, indices in episodes.items():
+        for score, indices in episodes_dict.items():
             if len(indices) < 2:
                 continue
-
             score_data = {}
             for h_name, h_days in REGIONAL_HORIZONS.items():
                 rets, mdds = [], []
-
                 for idx in indices:
                     if idx + 1 >= len(rolling):
                         continue
                     start_date = rolling[idx + 1]["date"]
-
                     p0 = etf_prices.get(start_date)
                     if p0 is None:
                         for offset in range(1, 5):
@@ -864,15 +863,12 @@ def compute_regional(all_data: dict, rolling: list) -> dict:
                                     break
                     if p0 is None or p0 <= 0:
                         continue
-
                     si = date_idx.get(start_date)
                     if si is None:
                         continue
-
                     ei = si + h_days
                     if ei >= len(rolling):
                         continue
-
                     end_date = rolling[ei]["date"]
                     p_end = etf_prices.get(end_date)
                     if p_end is None:
@@ -883,9 +879,7 @@ def compute_regional(all_data: dict, rolling: list) -> dict:
                                     break
                     if p_end is None:
                         continue
-
                     rets.append(round((p_end - p0) / p0, 6))
-
                     peak, mdd = p0, 0.0
                     for di in range(si, min(ei + 1, len(rolling))):
                         px = etf_prices.get(rolling[di]["date"])
@@ -896,16 +890,28 @@ def compute_regional(all_data: dict, rolling: list) -> dict:
                             if dd < mdd:
                                 mdd = dd
                     mdds.append(round(mdd, 6))
-
                 if len(rets) >= 2:
                     score_data[h_name] = {"rets": rets, "mdds": mdds}
-
             if score_data:
                 fwd_by_score[str(score)] = score_data
+        return fwd_by_score
 
-        if fwd_by_score:
-            result[key] = {"fwdByScore": fwd_by_score}
+    result = {}
 
+    for key, ticker in available.items():
+        etf = all_data[ticker]
+        etf_prices = {d: p for d, p in zip(etf["dates"], etf["adjCloses"])}
+
+        det_fwd = _compute_fwd(etf_prices, det_episodes)
+        imp_fwd = _compute_fwd(etf_prices, imp_episodes)
+
+        etf_result = {}
+        if det_fwd:
+            etf_result["det"] = det_fwd
+        if imp_fwd:
+            etf_result["imp"] = imp_fwd
+        if etf_result:
+            result[key] = etf_result
 
     # Beta by regime
     correlations = {}
