@@ -26,7 +26,8 @@ SP500_SAMPLE = [
     "DIS","CMCSA","NFLX","T","VZ","CHTR",
     "SPY",
 ]
-EXTRA_TICKERS = ["VWO", "BND", "IEF", "SHV", "TLT", "SHY", "^VIX", "^VIX3M"]
+EXTRA_TICKERS = ["VWO", "BND", "IEF", "SHV", "TLT", "SHY", "^VIX", "^VIX3M",
+                 "MCHI", "EWS", "EWM", "EIDO", "THD", "EPHE"]  # Regional ETFs for spillover analysis
 ALL_TICKERS = list(set(SP500_SAMPLE + EXTRA_TICKERS))
 SAMPLE_SIZE = len([t for t in SP500_SAMPLE if t != "SPY"])
 SCALE_FACTOR = 500 / SAMPLE_SIZE
@@ -515,6 +516,11 @@ def compute_all(all_data: dict) -> dict:
         monitor["ranges"]["mom12m"] = {"min": min(mom_vals), "max": max(mom_vals),
                                         "median": sorted(mom_vals)[len(mom_vals)//2]}
 
+    # Regional spillover analysis (China + ASEAN ETFs)
+    regional = compute_regional(all_data, rolling)
+    if regional:
+        monitor["regional"] = regional
+
     # ─── QC ───
     qc = run_qc(all_data, rolling, signals, bt, metrics)
 
@@ -785,3 +791,172 @@ def run_qc(all_data, rolling, signals, bt, m):
         chk("Stats", "Avg fwd max DD", f"{avg_dd * 100:.1f}%", "pass" if avg_dd > -0.40 else "warn")
 
     return checks
+
+
+# ─── Regional spillover analysis ───
+
+REGIONAL_ETFS = {
+    "mchi": "MCHI", "ews": "EWS", "ewm": "EWM",
+    "eido": "EIDO", "thd": "THD", "ephe": "EPHE",
+}
+REGIONAL_FWD_HORIZON = 21  # 4W
+
+
+def compute_regional(all_data: dict, rolling: list) -> dict:
+    """
+    Compute forward returns & drawdowns for regional ETFs by US score deterioration episode.
+    Also computes beta-to-SPX by regime (low/mid/high score).
+    Returns dict matching the MON.regional schema expected by the template.
+    """
+    # Check if any regional data is available
+    available = {k: v for k, v in REGIONAL_ETFS.items() if v in all_data}
+    if not available:
+        log.info("  Regional: no ETF data available, skipping")
+        return {}
+
+    log.info(f"  Regional: computing for {list(available.values())}")
+
+    # Build date→index map for rolling
+    date_idx = {r["date"]: i for i, r in enumerate(rolling)}
+
+    # SPY daily returns for beta calculation
+    spy_data = all_data.get("SPY", {})
+    spy_date_price = {}
+    if spy_data:
+        for d, p in zip(spy_data["dates"], spy_data["adjCloses"]):
+            spy_date_price[d] = p
+
+    # Identify deterioration episodes (score rises to N from lower)
+    episodes = {s: [] for s in range(7)}
+    for i in range(1, len(rolling)):
+        cur = rolling[i]["compositeScore"]
+        prev = rolling[i - 1]["compositeScore"]
+        if cur > prev:
+            episodes[cur].append(i)
+
+    # Add Score 0 baseline: sample every 21st day at score 0
+    s0_indices = [i for i, r in enumerate(rolling) if r["compositeScore"] == 0]
+    episodes[0] = s0_indices[::21] if len(s0_indices) > 50 else s0_indices
+
+    result = {}
+
+    for key, ticker in available.items():
+        etf = all_data[ticker]
+        # Build date→price lookup
+        etf_prices = {}
+        for d, p in zip(etf["dates"], etf["adjCloses"]):
+            etf_prices[d] = p
+
+        # Forward returns by score
+        fwd_by_score = {}
+        for score, indices in episodes.items():
+            if len(indices) < 2:
+                continue
+
+            rets, mdds = [], []
+            for idx in indices:
+                # T+1 start
+                if idx + 1 >= len(rolling):
+                    continue
+                start_date = rolling[idx + 1]["date"]
+
+                # Find ETF price on or near start date
+                p0 = etf_prices.get(start_date)
+                if p0 is None:
+                    for offset in range(1, 5):
+                        if idx + 1 + offset < len(rolling):
+                            alt = rolling[idx + 1 + offset]["date"]
+                            p0 = etf_prices.get(alt)
+                            if p0 is not None:
+                                start_date = alt
+                                break
+                if p0 is None or p0 <= 0:
+                    continue
+
+                # Find start index in rolling for the matched date
+                si = date_idx.get(start_date)
+                if si is None:
+                    continue
+
+                # End date
+                ei = si + REGIONAL_FWD_HORIZON
+                if ei >= len(rolling):
+                    continue
+
+                # Find ETF price at end
+                end_date = rolling[ei]["date"]
+                p_end = etf_prices.get(end_date)
+                if p_end is None:
+                    for off in range(-2, 3):
+                        if 0 <= ei + off < len(rolling):
+                            p_end = etf_prices.get(rolling[ei + off]["date"])
+                            if p_end is not None:
+                                break
+                if p_end is None:
+                    continue
+
+                rets.append(round((p_end - p0) / p0, 6))
+
+                # MDD over the window
+                peak, mdd = p0, 0.0
+                for di in range(si, min(ei + 1, len(rolling))):
+                    px = etf_prices.get(rolling[di]["date"])
+                    if px is not None:
+                        if px > peak:
+                            peak = px
+                        dd = (px - peak) / peak
+                        if dd < mdd:
+                            mdd = dd
+                mdds.append(round(mdd, 6))
+
+            if len(rets) >= 2:
+                fwd_by_score[str(score)] = {"rets": rets, "mdds": mdds}
+
+        if fwd_by_score:
+            result[key] = {"fwdByScore": fwd_by_score}
+
+    # Beta by regime
+    correlations = {}
+    for key, ticker in available.items():
+        etf = all_data[ticker]
+        etf_prices = {d: p for d, p in zip(etf["dates"], etf["adjCloses"])}
+
+        # Daily returns paired with score
+        regime_pairs = {"low": [], "mid": [], "high": []}
+        prev_spy, prev_etf = None, None
+        for r in rolling:
+            d = r["date"]
+            spy_p = spy_date_price.get(d)
+            etf_p = etf_prices.get(d)
+            if spy_p and etf_p and prev_spy and prev_etf:
+                spy_ret = (spy_p - prev_spy) / prev_spy
+                etf_ret = (etf_p - prev_etf) / prev_etf
+                sc = r["compositeScore"]
+                bucket = "low" if sc <= 1 else ("mid" if sc <= 3 else "high")
+                regime_pairs[bucket].append((spy_ret, etf_ret))
+            prev_spy = spy_p
+            prev_etf = etf_p
+
+        betas = {}
+        for regime, pairs in regime_pairs.items():
+            if len(pairs) < 30:
+                betas[regime] = None
+                continue
+            spy_arr = [p[0] for p in pairs]
+            etf_arr = [p[1] for p in pairs]
+            n = len(spy_arr)
+            mean_s = sum(spy_arr) / n
+            mean_e = sum(etf_arr) / n
+            cov = sum((s - mean_s) * (e - mean_e) for s, e in zip(spy_arr, etf_arr)) / (n - 1)
+            var_s = sum((s - mean_s) ** 2 for s in spy_arr) / (n - 1)
+            betas[regime] = round(cov / var_s, 2) if var_s > 0 else None
+
+        if any(v is not None for v in betas.values()):
+            correlations[key] = betas
+
+    if correlations:
+        result["correlations"] = correlations
+
+    n_etfs = len([k for k in result if k != "correlations"])
+    log.info(f"  Regional: {n_etfs} ETFs computed")
+    return result
