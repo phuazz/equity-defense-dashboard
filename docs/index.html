@@ -372,6 +372,31 @@ for(var ri=1;ri<R.length;ri++){
   if(cur<prev)impEpisodes[cur].push(ri);// improvement: score fell
 }
 
+// Determine where the "NOW" marker should be anchored.
+// Direction = sign of the most recent non-flat transition in rolling[], walked
+// backward from the latest row. Cold-start fallback: 'imp'.
+function computeNowConfig(){
+  if(cs==null)return{panel:'imp',useBaseline:false,note:null};
+  var dir='imp';
+  for(var j=R.length-2;j>=0;j--){
+    var ps=R[j].compositeScore;
+    if(ps==null||ps===cs)continue;
+    dir=ps<cs?'det':'imp';
+    break;
+  }
+  var targetEps=(dir==='det'?detEpisodes:impEpisodes)[cs];
+  var inRange=(dir==='det'?(cs>=1&&cs<=6):(cs>=0&&cs<=5));
+  if(inRange&&targetEps&&targetEps.length>0){
+    return{panel:dir,useBaseline:false,note:null};
+  }
+  if(cs===0){
+    return{panel:'det',useBaseline:true,
+      note:'no prior episodes at this level \u2014 showing baseline'};
+  }
+  return{panel:dir,useBaseline:false,note:null};
+}
+var nowConfig=computeNowConfig();
+
 // Compute forward stats for a set of episodes
 function epStats(indices,horizon){
   var rets=[],mdds=[];
@@ -553,7 +578,16 @@ function buildPanel(episodes,chartId,noteId,direction){
 
       // Score 0 baseline gets a distinct muted style
       var isBase=sc===0&&direction==='det';
-      var isCurrent=sc===cs&&direction==='det';  // Only highlight current score in deterioration panel
+      // Highlight the cs row in BOTH panels for comparative read. The NOW
+      // annotation itself is gated on direction===nowConfig.panel below.
+      // Never highlight the synthetic baseline row unless nowConfig falls back
+      // to it (only possible in the det panel, since isBase is det-only).
+      var isCurrent;
+      if(nowConfig.useBaseline){
+        isCurrent=isBase;
+      } else {
+        isCurrent=(sc===cs&&!isBase);
+      }
       var bColor=isBase?'rgba(140,149,165,':baseColor;
       var bFill=isBase?0.15:fillAlpha;
       var lineW=isCurrent?(M?2:2.5):(M?1:1.5);
@@ -596,10 +630,16 @@ function buildPanel(episodes,chartId,noteId,direction){
         showarrow:false,
         font:{size:isCurrent?(M?9:11):(M?8:9),color:isBase?'#555':(isDD?'#991b1b':(dp.med>=0?'#15803d':'#b91c1c'))},
         yshift:M?-13:-15});
-      // "NOW" marker on first panel
-      if(isCurrent&&pi===0){
+      // "NOW" marker on first panel, but only in the panel matching
+      // nowConfig (highlight is already shown in both panels via isCurrent).
+      if(isCurrent&&pi===0&&direction===nowConfig.panel){
+        var nowText='<b>\u25c4 NOW</b>';
+        if(nowConfig.note){
+          nowText+='<br><span style="font-size:'+(M?7:8)+'px;color:#888">'
+            +nowConfig.note+'</span>';
+        }
         annotations.push({x:1,y:yLabel,xref:xAxis+' domain',yref:yAxis,
-          text:'<b>◄ NOW</b>',showarrow:false,
+          text:nowText,showarrow:false,align:'left',
           font:{size:M?8:9,color:cs>=3?'#dc2626':'#b45309'},xshift:M?2:4});
       }
     });
