@@ -68,7 +68,10 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 .sbox h3{color:var(--grn);font-size:13px;margin-bottom:3px;font-weight:700}.sbox p{color:var(--t2);font-size:12px;line-height:1.5}
 .qc{border:2px solid var(--amb);border-radius:10px;padding:14px;background:var(--amb-bg);margin:12px 0}
 .qc h3{color:var(--amb);font-size:14px;margin-bottom:8px;font-family:'Source Serif 4',serif;font-weight:700}
-.qi{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(180,83,9,.08);font-size:12px;gap:6px}.qi:last-child{border:none}
+.qi{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--b);font-size:13px;gap:6px}.qi:last-child{border:none}
+.qi:nth-child(odd){background:var(--sf)}
+.qi:first-child{border-top-left-radius:6px;border-top-right-radius:6px}
+.qi:last-child{border-bottom-left-radius:6px;border-bottom-right-radius:6px}
 .qi span:first-child{flex:1;min-width:0}.qi span:last-child{text-align:right;flex-shrink:0}
 .sa{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 @media(min-width:600px){.sa{grid-template-columns:repeat(4,1fr)}}
@@ -137,7 +140,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
-<div class="ch"><div class="ch-t">Composite Score History</div><div id="ch-score" style="height:180px"></div></div>
+<div class="ch"><div class="ch-t">Composite Score History</div><div class="ind-range-btns" id="mon-range-btns" style="margin:4px 4px 6px"><button class="ind-range-btn on" data-range="2">2Y</button><button class="ind-range-btn" data-range="1">1Y</button><button class="ind-range-btn" data-range="5">5Y</button><button class="ind-range-btn" data-range="10">10Y</button><button class="ind-range-btn" data-range="0">All</button></div><div id="ch-score" style="height:180px"></div></div>
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="sec" style="font-size:14px">Score Episode Analysis</div>
 <div class="box" style="font-size:11px">What happens after score transitions? Box plots show forward return and drawdown distributions by score level at entry (deterioration) and exit (improvement). Shaded band = unconditional baseline.</div>
@@ -184,7 +187,7 @@ function log(s){const d=$('#load-log');d.innerHTML+=s+'<br>';d.scrollTop=d.scrol
 function pct(v,d=1){return v==null?'—':(v>=0?'+':'')+((v*100).toFixed(d))+'%'}
 function fmt(v,d=0){return v==null?'—':v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d})}
 const M=window.innerWidth<768;
-const PL=(t='')=>({paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{family:'Source Sans 3',size:M?9:12,color:'#555b6e'},title:t?{text:t,font:{size:M?10:14,color:'#1a1a2e'},x:0,xanchor:'left',y:.98}:undefined,margin:{t:t?28:8,r:M?4:16,b:M?28:36,l:M?34:56},xaxis:{gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?8:11}},yaxis:{gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?8:11}},legend:{bgcolor:'transparent',font:{size:M?8:11},orientation:'h',y:-.22,x:.5,xanchor:'center'},hovermode:M?'closest':'x unified',dragmode:false});
+const PL=(t='')=>({paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{family:'Source Sans 3',size:M?9:12,color:'#333'},title:t?{text:t,font:{size:M?10:14,color:'#1a1a2e'},x:0,xanchor:'left',y:.98}:undefined,margin:{t:t?28:8,r:M?10:28,b:M?40:50,l:M?34:56},xaxis:{gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?10:12,color:'#333'}},yaxis:{gridcolor:'#eee',linecolor:'#eee',tickfont:{size:M?10:12,color:'#333'}},legend:{bgcolor:'transparent',font:{size:M?9:12,color:'#333'},orientation:'h',y:-.22,x:.5,xanchor:'center'},hovermode:M?'closest':'x unified',dragmode:false});
 const PC=M?{responsive:true,displayModeBar:false,scrollZoom:false,staticPlot:true}:{responsive:true,displayModeBar:false,scrollZoom:false};
 const lw=M?1:1.5;
 
@@ -695,7 +698,21 @@ buildPanel(impEpisodes,'#sa-imp-chart','#sa-imp-note','imp');
 var ah=MON.allocHist||[];
 if(ah.length>0){Plotly.newPlot('ch-ahist',[{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.spy}),type:'scatter',fill:'tozeroy',name:'SPY%',line:{color:'#2563eb',width:0},fillcolor:'rgba(37,99,235,.25)'},{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.ief}),type:'scatter',name:'IEF%',line:{color:'#15803d',width:1},fillcolor:'rgba(22,163,74,.1)'}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,105]})}),PC)}
 
-Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]})}),PC);
+function monRangeStart(years){
+  if(years===0)return R[0].date;
+  var d=new Date(last.date);
+  d.setFullYear(d.getFullYear()-years);
+  return d.toISOString().slice(0,10);
+}
+Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[monRangeStart(2),last.date]}),hovermode:'closest',margin:Object.assign({},PL().margin,{r:M?12:40,b:M?40:50})}),PC);
+$$('#mon-range-btns .ind-range-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    $$('#mon-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
+    btn.classList.add('on');
+    var y=parseInt(btn.dataset.range);
+    Plotly.relayout('ch-score',{'xaxis.range':[monRangeStart(y),last.date]});
+  });
+});
 
 // === INDICATORS TAB ===
 // Status strip — compact signal state summary
