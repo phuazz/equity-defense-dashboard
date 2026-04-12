@@ -135,7 +135,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="cio-narrative"></div>
 <div class="sec" style="font-size:14px">Signal Dashboard</div>
 <div id="sig-dashboard" class="sig-grid"></div>
-<div class="ch"><div class="ch-t">S&P 500 — Last 12 Months</div><div id="ch-spx-recent" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">SPDR S&P 500 ETF (SPY)</div><div class="ind-range-btns" id="spx-range-btns" style="margin:4px 4px 6px"><button class="ind-range-btn on" data-range="12">1Y</button><button class="ind-range-btn" data-range="24">2Y</button><button class="ind-range-btn" data-range="60">5Y</button><button class="ind-range-btn" data-range="120">10Y</button><button class="ind-range-btn" data-range="0">All</button></div><div id="ch-spx-recent" style="height:200px"></div></div>
 <div class="sec" style="font-size:14px">Signal Detail</div>
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
@@ -158,7 +158,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 </div>
 <div class="ch" style="margin-bottom:4px"><div class="ch-t">Composite Score</div><div id="ind-score" style="height:180px"></div></div>
 <div class="ind-grid">
-<div class="ch"><div class="ch-t">SPX vs 200-Day MA</div><div id="ind-ma200" style="height:200px"></div></div>
+<div class="ch"><div class="ch-t">SPY vs 200-Day MA</div><div id="ind-ma200" style="height:200px"></div></div>
 <div class="ch"><div class="ch-t">8-Day Stress Count</div><div id="ind-8d" style="height:200px"></div></div>
 <div class="ch"><div class="ch-t">SPY 12-Month Return</div><div id="ind-12m" style="height:200px"></div></div>
 <div class="ch"><div class="ch-t">Canary Assets</div><div id="ind-canary" style="height:200px"></div></div>
@@ -240,18 +240,34 @@ if(nds!==cs){
   $('#mon-alloc').innerHTML+='<div style="margin-top:8px;padding:10px 14px;border-radius:10px;border:2px solid '+ndc+';background:'+ndBg+';font-size:13px"><strong style="color:'+ndc+'">'+arrow+' Next-Day Signal: '+nds+'/6 → '+ndl+'</strong><div style="color:var(--t2);margin-top:3px;font-size:12px">Based on today\'s close. Tomorrow\'s allocation: <strong>'+nda+'</strong>.'+(vxI&&nds>cs?' VIX term structure inverted ('+last.vixRatio.toFixed(3)+').':'')+'</div></div>';
 }
 
-// SPX chart with entry (red ▼) and exit (green ▲) annotations
-var r12=R.slice(Math.max(0,R.length-252));
-var sig12=SIG.filter(function(s){return s.date>=r12[0].date});
-var trans12=(MON.transitions||[]).filter(function(t){return t.date>=r12[0].date});
-var entries12=trans12.filter(function(t){return t.type==='entry'});
-var exits12=trans12.filter(function(t){return t.type==='exit'});
-Plotly.newPlot('ch-spx-recent',[
-  {x:r12.map(function(r){return r.date}),y:r12.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPX',line:{color:'#2563eb',width:lw+.5}},
-  {x:r12.filter(function(r){return r.sma200!=null}).map(function(r){return r.date}),y:r12.filter(function(r){return r.sma200!=null}).map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1,dash:'dot'}},
-  {x:entries12.map(function(t){return t.date}),y:entries12.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def Entry',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
-  {x:exits12.map(function(t){return t.date}),y:exits12.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def Exit',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
-],PL(),PC);
+// SPY chart with entry (red ◆) and exit (green ◆) annotations
+var spxTrans=(MON.transitions||[]);
+var spxEntries=spxTrans.filter(function(t){return t.type==='entry'});
+var spxExits=spxTrans.filter(function(t){return t.type==='exit'});
+function spxLayout(){
+  var ya=Object.assign({},PL().yaxis,{tickformat:',',hoverformat:'.1f'});
+  return{yaxis:ya,hovermode:'closest',margin:Object.assign({},PL().margin,{r:M?12:40})};
+}
+function drawSpx(months){
+  var start=rangeStart(months);
+  var rF=R.filter(function(r){return r.date>=start});
+  var eF=spxEntries.filter(function(t){return t.date>=start});
+  var xF=spxExits.filter(function(t){return t.date>=start});
+  Plotly.react('ch-spx-recent',[
+    {x:rF.map(function(r){return r.date}),y:rF.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw+.5}},
+    {x:rF.filter(function(r){return r.sma200!=null}).map(function(r){return r.date}),y:rF.filter(function(r){return r.sma200!=null}).map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1,dash:'dot'}},
+    {x:eF.map(function(t){return t.date}),y:eF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Entering Defence',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
+    {x:xF.map(function(t){return t.date}),y:xF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Exiting Defence',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
+  ],Object.assign({},PL(),spxLayout()),PC);
+}
+drawSpx(12);
+$$('#spx-range-btns .ind-range-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    $$('#spx-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
+    btn.classList.add('on');
+    drawSpx(parseInt(btn.dataset.range));
+  });
+});
 
 // Signal range bars — iOS Weather-style gradient with dot indicator
 var px=MON.proximity||{};
@@ -267,14 +283,14 @@ var stBuf=((115-last.rolling8d)/115*100).toFixed(0);
 var stCol=ba?'#dc2626':last.rolling8d>80?'#b45309':'#15803d';
 sigHtml+=rangeBar('8-Day Stress Count','Number of stocks down ≥7% in 8 trading days',last.rolling8d+' / 115',stPct,stThPct,'linear-gradient(90deg, #15803d 0%, #65a30d 30%, #b45309 46%, #dc2626 60%, #7f1d1d 100%)',ba?'⚠ ABOVE threshold — signal triggered':stBuf+'% buffer to threshold',stCol);
 
-// 2. 200d MA: SPX position relative to MA. Show as % ratio.
+// 2. 200d MA: SPY position relative to MA. Show as % ratio.
 var ma2v=px.sma200||{};
 var ma2pct=ma2v.pct!=null?ma2v.pct:0;
 var ma2ratio=ma2v.ma?last.spx/ma2v.ma:1;
 var ma2dot=Math.min(Math.max((ma2ratio-0.85)/(1.15-0.85)*100,0),100);
 var ma2thPct=(1.0-0.85)/(1.15-0.85)*100;
 var ma2col=b2?'#dc2626':Math.abs(ma2pct)<0.03?'#b45309':'#15803d';
-sigHtml+=rangeBar('200-Day Moving Average','SPX position vs 200d MA — below triggers bear regime',fmt(last.spx,0)+' vs '+fmt(ma2v.ma,0)+' ('+(ma2pct>0?'+':'')+(ma2pct*100).toFixed(1)+'%)',ma2dot,ma2thPct,'linear-gradient(90deg, #dc2626 0%, #b45309 40%, #65a30d 50%, #15803d 70%, #15803d 100%)',b2?'⚠ BELOW 200d MA — bearish regime':Math.abs(ma2pct)<0.03?'⚠ Only '+(ma2pct*100).toFixed(1)+'% above — watch closely':(ma2pct*100).toFixed(1)+'% above MA',ma2col);
+sigHtml+=rangeBar('200-Day Moving Average','SPY position vs 200d MA — below triggers bear regime',fmt(last.spx,0)+' vs '+fmt(ma2v.ma,0)+' ('+(ma2pct>0?'+':'')+(ma2pct*100).toFixed(1)+'%)',ma2dot,ma2thPct,'linear-gradient(90deg, #dc2626 0%, #b45309 40%, #65a30d 50%, #15803d 70%, #15803d 100%)',b2?'⚠ BELOW 200d MA — bearish regime':Math.abs(ma2pct)<0.03?'⚠ Only '+(ma2pct*100).toFixed(1)+'% above — watch closely':(ma2pct*100).toFixed(1)+'% above MA',ma2col);
 
 // 3. Canary: 0/2 = safe, 1/2 or 2/2 = risk
 var canDot=last.canaryBad/2*100;
@@ -762,10 +778,10 @@ Plotly.newPlot('ind-score',[
   {x:[iDates[0],iDates[iDates.length-1]],y:[2,2],type:'scatter',mode:'lines',name:'\u22652 Def',line:{color:'#b45309',width:1,dash:'dash'}}
 ],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.compositeScore>=2}),'rgba(220,38,38,0.06)')),PC);
 
-// 2) SPX vs 200-Day MA
+// 2) SPY vs 200-Day MA
 var ma200D=R.filter(function(r){return r.sma200!=null});
 Plotly.newPlot('ind-ma200',[
-  {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPX',line:{color:'#2563eb',width:lw}},
+  {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw}},
   {x:ma200D.map(function(r){return r.date}),y:ma200D.map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1.5,dash:'dot'}}
 ],indLayout({yaxis:Object.assign({},PL().yaxis,{type:'log'}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.sma200!=null&&r.spx<r.sma200}),'rgba(220,38,38,0.06)')),PC);
 
@@ -797,7 +813,7 @@ if(hasCan.length>0){
 var hasSMA10=R.filter(function(r){return r.sma10m!=null});
 if(hasSMA10.length>0){
   Plotly.newPlot('ind-sma10',[
-    {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPX',line:{color:'#2563eb',width:lw}},
+    {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw}},
     {x:hasSMA10.map(function(r){return r.date}),y:hasSMA10.map(function(r){return r.sma10m}),type:'scatter',mode:'lines',name:'10M SMA',line:{color:'#15803d',width:1.5,dash:'dot'}}
   ],indLayout({yaxis:Object.assign({},PL().yaxis,{type:'log'}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.belowSMA10m}),'rgba(220,38,38,0.06)')),PC);
 } else {$('#ind-sma10').innerHTML='<div style="padding:20px;color:#999;text-align:center">10M SMA data not in rolling series</div>';}
@@ -1070,9 +1086,9 @@ if(TRADES.length>0){
   $('#ev-trade-stats').innerHTML=[
     {l:'Trades',v:TRADES.length,s:fullT.length+' full, '+partialT.length+' partial'+(TRADES.length-closedT.length>0?', '+(TRADES.length-closedT.length)+' open':'')},
     {l:'Avg Duration',v:Math.round(avgN(tDurs))+'d',s:'Med: '+Math.round(medN(tDurs))+'d'},
-    {l:'Avg SPX Δ',v:pct(avgN(tRets)),s:'Med: '+pct(medN(tRets)),c:avgN(tRets)>=0?'pos':'neg'},
+    {l:'Avg SPY Δ',v:pct(avgN(tRets)),s:'Med: '+pct(medN(tRets)),c:avgN(tRets)>=0?'pos':'neg'},
     {l:'Avg Max DD',v:pct(avgN(tDDs)),s:'Med: '+pct(medN(tDDs)),c:'neg'},
-    {l:'SPX Positive',v:closedT.filter(function(t){return t.spxRet>0}).length+'/'+closedT.length,s:pct(closedT.filter(function(t){return t.spxRet>0}).length/closedT.length)+' win rate'},
+    {l:'SPY Positive',v:closedT.filter(function(t){return t.spxRet>0}).length+'/'+closedT.length,s:pct(closedT.filter(function(t){return t.spxRet>0}).length/closedT.length)+' win rate'},
     {l:'VIX Inverted',v:vixT+'/'+vixPct,s:vixPct>0?pct(vixT/vixPct)+' of trades w/ data':'No VIX data'}
   ].map(function(c){return '<div class="sa-c"><div class="sa-l">'+c.l+'</div><div class="sa-v '+(c.c||'')+'">'+c.v+'</div><div class="sa-s">'+c.s+'</div></div>'}).join('');
 }
@@ -1092,7 +1108,7 @@ $$('.ev-row').forEach(function(row){
     var trade=TRADES.find(function(t){return t.id===tid});
     if(!trade||!trade.path||trade.path.length===0)return;
     $('#ev-ch-wrap').style.display='block';
-    $('#ev-ch-title').textContent='Trade #'+tid+': '+trade.entryDate+' → '+(trade.open?'OPEN':trade.exitDate)+' (SPX indexed to 100 at entry)';
+    $('#ev-ch-title').textContent='Trade #'+tid+': '+trade.entryDate+' → '+(trade.open?'OPEN':trade.exitDate)+' (SPY indexed to 100 at entry)';
     var before=trade.path.filter(function(p){return p.phase==='before'});
     var during=trade.path.filter(function(p){return p.phase==='during'});
     var after=trade.path.filter(function(p){return p.phase==='after'});
