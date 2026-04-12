@@ -256,8 +256,8 @@ function drawSpx(months){
   Plotly.react('ch-spx-recent',[
     {x:rF.map(function(r){return r.date}),y:rF.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw+.5}},
     {x:rF.filter(function(r){return r.sma200!=null}).map(function(r){return r.date}),y:rF.filter(function(r){return r.sma200!=null}).map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1,dash:'dot'}},
-    {x:eF.map(function(t){return t.date}),y:eF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def. Entry',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
-    {x:xF.map(function(t){return t.date}),y:xF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def. Exit',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
+    {x:eF.map(function(t){return t.date}),y:eF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Entry',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
+    {x:xF.map(function(t){return t.date}),y:xF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Exit',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
   ],Object.assign({},PL(),spxLayout()),PC);
 }
 drawSpx(12);
