@@ -140,7 +140,7 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div id="mon-sig"></div>
 <div class="sec" style="font-size:14px">Regime Context</div>
 <div class="cd" id="mon-context"></div>
-<div class="ch"><div class="ch-t">Composite Score History</div><div class="ind-range-btns" id="mon-range-btns" style="margin:4px 4px 6px"><button class="ind-range-btn on" data-range="2">2Y</button><button class="ind-range-btn" data-range="1">1Y</button><button class="ind-range-btn" data-range="5">5Y</button><button class="ind-range-btn" data-range="10">10Y</button><button class="ind-range-btn" data-range="0">All</button></div><div id="ch-score" style="height:180px"></div></div>
+<div class="ch"><div class="ch-t">Composite Score History</div><div class="ind-range-btns" id="mon-range-btns" style="margin:4px 4px 6px"><button class="ind-range-btn on" data-range="24">2Y</button><button class="ind-range-btn" data-range="12">1Y</button><button class="ind-range-btn" data-range="60">5Y</button><button class="ind-range-btn" data-range="120">10Y</button><button class="ind-range-btn" data-range="0">All</button></div><div id="ch-score" style="height:180px"></div></div>
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="sec" style="font-size:14px">Score Episode Analysis</div>
 <div class="box" style="font-size:11px">What happens after score transitions? Box plots show forward return and drawdown distributions by score level at entry (deterioration) and exit (improvement). Shaded band = unconditional baseline.</div>
@@ -151,9 +151,9 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div class="sec">Signal Time Series</div>
 <div id="ind-status-strip" class="ind-strip"></div>
 <div class="ind-range-btns" id="ind-range-btns">
-<button class="ind-range-btn" data-range="63">3M</button>
-<button class="ind-range-btn on" data-range="252">1Y</button>
-<button class="ind-range-btn" data-range="756">3Y</button>
+<button class="ind-range-btn" data-range="3">3M</button>
+<button class="ind-range-btn on" data-range="12">1Y</button>
+<button class="ind-range-btn" data-range="36">3Y</button>
 <button class="ind-range-btn" data-range="0">All</button>
 </div>
 <div class="ch" style="margin-bottom:4px"><div class="ch-t">Composite Score</div><div id="ind-score" style="height:180px"></div></div>
@@ -698,19 +698,19 @@ buildPanel(impEpisodes,'#sa-imp-chart','#sa-imp-note','imp');
 var ah=MON.allocHist||[];
 if(ah.length>0){Plotly.newPlot('ch-ahist',[{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.spy}),type:'scatter',fill:'tozeroy',name:'SPY%',line:{color:'#2563eb',width:0},fillcolor:'rgba(37,99,235,.25)'},{x:ah.map(function(a){return a.d}),y:ah.map(function(a){return a.ief}),type:'scatter',name:'IEF%',line:{color:'#15803d',width:1},fillcolor:'rgba(22,163,74,.1)'}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,105]})}),PC)}
 
-function monRangeStart(years){
-  if(years===0)return R[0].date;
+function rangeStart(months){
+  if(months===0)return R[0].date;
   var d=new Date(last.date);
-  d.setFullYear(d.getFullYear()-years);
+  d.setMonth(d.getMonth()-months);
   return d.toISOString().slice(0,10);
 }
-Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[monRangeStart(2),last.date]}),hovermode:'closest',margin:Object.assign({},PL().margin,{r:M?12:40,b:M?40:50})}),PC);
+Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[rangeStart(24),last.date]}),hovermode:'closest',margin:Object.assign({},PL().margin,{r:M?12:40,b:M?40:50})}),PC);
 $$('#mon-range-btns .ind-range-btn').forEach(function(btn){
   btn.addEventListener('click',function(){
     $$('#mon-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
     btn.classList.add('on');
     var y=parseInt(btn.dataset.range);
-    Plotly.relayout('ch-score',{'xaxis.range':[monRangeStart(y),last.date]});
+    Plotly.relayout('ch-score',{'xaxis.range':[rangeStart(y),last.date]});
   });
 });
 
@@ -723,13 +723,13 @@ $('#ind-status-strip').innerHTML=signals.map(function(s){
 
 // Range button handler — relayout all indicator charts
 var indChartIds=['ind-score','ind-ma200','ind-8d','ind-12m','ind-canary','ind-sma10','ind-vix'];
-var indRange=252;// default 1Y
+var indRange=12;// default 1Y (months)
 $$('#ind-range-btns .ind-range-btn').forEach(function(btn){
   btn.addEventListener('click',function(){
     $$('#ind-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
     btn.classList.add('on');
     indRange=parseInt(btn.dataset.range);
-    var startDate=indRange>0?R[Math.max(0,R.length-indRange)].date:R[0].date;
+    var startDate=indRange>0?rangeStart(indRange):R[0].date;
     var endDate=last.date;
     indChartIds.forEach(function(id){
       var el=document.getElementById(id);
