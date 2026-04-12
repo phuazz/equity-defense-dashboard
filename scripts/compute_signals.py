@@ -152,7 +152,7 @@ def compute_all(all_data: dict) -> dict:
         d = rolling[i]["date"]
         prev_d = rolling[i - 1]["date"] if i > 0 else None
         p1, p0 = ief_map.get(d), (ief_map.get(prev_d) if prev_d else None)
-        rolling[i]["iefRet"] = (p1 - p0) / p0 if (p0 and p1) else 0
+        rolling[i]["iefRet"] = (p1 - p0) / p0 if (p0 and p1) else CASH_RATE
 
     # ─── SHY daily returns ───
     for i in range(len(rolling)):
@@ -187,6 +187,8 @@ def compute_all(all_data: dict) -> dict:
     def ief_12m(i):
         return math.exp(ief_cum[i] - ief_cum[i - 252]) - 1 if i >= 252 else None
 
+    monthly_mom = [0]  # latched monthly: 12M momentum signal
+    monthly_sma = [0]  # latched monthly: 10M SMA signal
     for i in range(len(rolling)):
         rolling[i]["sma10m"] = sma10m(i)
         rolling[i]["spy12mRet"] = ret12m(i)
@@ -237,22 +239,25 @@ def compute_all(all_data: dict) -> dict:
         # Composite score (6 sub-signals)
         # Note: vixInverted uses T-1 (previous day's reading) for T+1 execution
         # consistency with the VIX standalone strategy. All other price-based 
-        # signals are effectively T+0 (monthly signals where 1-day lag is negligible).
+        # 5 signals (canary removed).
+        # Daily signals (stress, 200d MA, VIX): use previous day's data (T+1).
+        # Monthly signals (12M mom, 10M SMA): latch at month-end, hold for entire month.
+        prev = rolling[i - 1] if i > 0 else rolling[i]
+        # Detect month boundary: previous day's month differs from current day's month
+        prev_month = rolling[i - 1]["date"][:7] if i > 0 else ""
+        curr_month = rolling[i]["date"][:7]
+        if prev_month != curr_month:
+            monthly_mom[0] = 1 if prev.get("spy12mNeg", False) else 0
+            monthly_sma[0] = 1 if prev.get("belowSMA10m", False) else 0
         score = 0
-        if rolling[i]["rolling8d"] >= THRESHOLD:
+        if prev["rolling8d"] >= THRESHOLD:
             score += 1
-        if rolling[i]["sma200"] is not None and rolling[i]["spx"] < rolling[i]["sma200"]:
+        if prev.get("sma200") is not None and prev["spx"] < prev["sma200"]:
             score += 1
-        if rolling[i]["canaryBad"] >= 1:
+        score += monthly_mom[0]
+        score += monthly_sma[0]
+        if prev.get("vixInverted", False):
             score += 1
-        if rolling[i]["spy12mNeg"]:
-            score += 1
-        if rolling[i]["belowSMA10m"]:
-            score += 1
-        if i > 0 and rolling[i - 1].get("vixInverted", False):
-            score += 1
-        elif i == 0:
-            pass  # Day 0: VIX cannot contribute
         rolling[i]["compositeScore"] = score
 
     # ─── Signal events ───
@@ -365,19 +370,25 @@ def compute_all(all_data: dict) -> dict:
     monitor["allocHist"] = alloc_hist
     
     # Composite regime transitions (entry/exit events for chart annotation)
-    # With Grad D scheme, score=1 is ignored. Entry = score goes from <2 to ≥2.
+    # Mirrors the min holding period in comp_fn: once defensive, stay for 42 trading days.
     transitions = []
-    prev_score = rolling[0]["compositeScore"]
-    prev_active = prev_score >= 2  # Defense active at score ≥2
+    t_cd = 0  # cooldown counter
+    t_active = rolling[0]["compositeScore"] >= 2
     for i in range(1, len(rolling)):
         curr_score = rolling[i]["compositeScore"]
-        curr_active = curr_score >= 2
-        if curr_active and not prev_active:
+        raw_active = curr_score >= 2
+        if raw_active and not t_active:
+            t_active = True
+            t_cd = 42
             transitions.append({"date": rolling[i]["date"], "type": "entry", "spx": rolling[i]["spx"], "score": curr_score})
-        elif not curr_active and prev_active:
+        if t_cd > 0:
+            t_cd -= 1
+        elif t_active and not raw_active:
+            t_active = False
             transitions.append({"date": rolling[i]["date"], "type": "exit", "spx": rolling[i]["spx"], "score": curr_score})
-        prev_active = curr_active
     monitor["transitions"] = transitions
+    monitor["defenceActive"] = t_active  # True if currently in defensive position (incl. cooldown)
+    monitor["cooldownRemaining"] = t_cd  # Days remaining in cooldown
 
     # Build paired defensive trades (entry → exit) with context
     date_to_idx = {rolling[i]["date"]: i for i in range(len(rolling))}
@@ -527,7 +538,7 @@ def compute_all(all_data: dict) -> dict:
     # ─── Assemble output ───
     # Thin the rolling data for JSON size — only keep every Nth day for charts
     # (full data for signal analysis, thinned for time series charts)
-    thin_n = max(1, len(rolling) // 2000)  # ~2000 points max
+    thin_n = 1  # Keep full daily resolution
     rolling_thin = [rolling[i] for i in range(0, len(rolling), thin_n)]
     if rolling[-1] not in rolling_thin:
         rolling_thin.append(rolling[-1])
@@ -550,7 +561,7 @@ def compute_all(all_data: dict) -> dict:
         "meta": {
             "startDate": rolling[0]["date"],
             "endDate": rolling[-1]["date"],
-            "years": (len(rolling)) / 252,
+            "years": (len(rolling) - 1) / 252,
             "signalCount": len(signals),
             "sampleSize": SAMPLE_SIZE,
             "scaleF": round(SCALE_FACTOR, 2),
@@ -613,27 +624,40 @@ def run_backtests(rolling, signals):
         # Blowup trigger (T+1 execution via pending flag)
         if r[i]["rolling8d"] >= THRESHOLD and not enh_def and not enh_pend:
             enh_pend = True
-        # Regime filter trigger (T+0, immediate)
-        bma = r[i]["sma200"] is not None and r[i]["spx"] < r[i]["sma200"]
-        if bma and r[i]["canaryBad"] >= 1 and not enh_def and not enh_pend:
-            enh_def = True
-            enh_cd = 63  # Also apply cooldown for regime entry
         # Cooldown countdown
         if enh_cd > 0:
             enh_cd -= 1
-        # Exit: above 200d + canary clear + cooldown expired
+        # Exit: above 200d + cooldown expired (T+1)
         if enh_def and enh_cd <= 0:
-            abv = r[i]["sma200"] is not None and r[i]["spx"] > r[i]["sma200"]
-            if abv and r[i]["canaryBad"] == 0:
+            prev_x = r[i - 1] if i > 0 else r[i]
+            abv = prev_x.get("sma200") is not None and prev_x["spx"] > prev_x["sma200"]
+            if abv:
                 enh_def = False
         return (1.0 if enh_def else 0.0, "defensive" if enh_def else "invested")
 
-    # S2: Faber 10M SMA
-    def fab_fn(i, r):
-        d = 1.0 if r[i]["belowSMA10m"] else 0.0
+    # S2a: 200d MA standalone (T+1: use previous day's signal)
+    def ma200_fn(i, r):
+        if i == 0:
+            return (0.0, "invested")
+        prev = r[i - 1]
+        d = 1.0 if (prev.get("sma200") is not None and prev["spx"] < prev["sma200"]) else 0.0
         return (d, "defensive" if d else "invested")
 
-    # S3: Dual Momentum
+    # S3: Faber 10M SMA — monthly re-evaluation only
+    # Observe month-end signal, execute first trading day of following month.
+    fab_state = [0.0]
+    def fab_fn(i, r):
+        prev_i = max(i - 1, 0)
+        # Check if previous day was last trading day of its month
+        prev_month = r[prev_i]["date"][:7]
+        curr_month = r[i]["date"][:7]
+        if prev_month != curr_month:
+            # Month boundary: latch signal from month-end data
+            fab_state[0] = 1.0 if r[prev_i].get("belowSMA10m", False) else 0.0
+        d = fab_state[0]
+        return (d, "defensive" if d else "invested")
+
+    # S4: Dual Momentum (Antonacci) — monthly re-evaluation only
     # IEF cumulative log return for 12m comparison
     ief_cum = [0.0]
     for i in range(1, n):
@@ -643,10 +667,16 @@ def run_backtests(rolling, signals):
         else:
             ief_cum.append(ief_cum[-1])
 
+    dm_state = [0.0]
     def dm_fn(i, r):
-        spy12 = r[i]["spy12mRet"]
-        ief12 = (math.exp(ief_cum[i] - ief_cum[i - 252]) - 1) if i >= 252 else None
-        d = 1.0 if (spy12 is not None and ief12 is not None and (spy12 < 0 or spy12 < ief12)) else 0.0
+        prev_i = max(i - 1, 0)
+        prev_month = r[prev_i]["date"][:7]
+        curr_month = r[i]["date"][:7]
+        if prev_month != curr_month:
+            spy12 = r[prev_i].get("spy12mRet")
+            ief12 = (math.exp(ief_cum[prev_i] - ief_cum[prev_i - 252]) - 1) if prev_i >= 252 else None
+            dm_state[0] = 1.0 if (spy12 is not None and ief12 is not None and (spy12 < 0 or spy12 < ief12)) else 0.0
+        d = dm_state[0]
         return (d, "defensive" if d else "invested")
 
     # S4: VIX Term Structure (T+1 execution: use previous day's confirmed inversion)
@@ -657,16 +687,31 @@ def run_backtests(rolling, signals):
         d = 1.0 if r[i - 1].get("vixInverted", False) else 0.0
         return (d, "defensive" if d else "invested")
 
-    # S5: Composite — Graduated D allocation scheme
-    # Score: 0→0%, 1→0%, 2→50%, 3→75%, 4+→100%
-    # Score=1 is noise (SPX still positive on average), so we skip it.
-    # This reduces tx costs by ~60% vs the old 0/50/100 scheme.
-    ALLOC_MAP = [0.0, 0.0, 0.5, 0.75, 1.0, 1.0, 1.0]
-    def comp_fn(i, r):
-        sc = min(r[i]["compositeScore"], 6)
-        d = ALLOC_MAP[sc]
-        mode = "invested" if d == 0 else ("partial" if d < 1.0 else "defensive")
-        return (d, mode)
+    # S5: Composite — 5 signals (canary removed), graduated allocation
+    # Score: 0-1→0%, 2→50%, 3+→100%
+    # Min holding period: once defensive (score>=2), stay for at least 42 trading days (~2 months)
+    # to prevent whipsaw from score oscillating around the threshold.
+    ALLOC_MAP = [0.0, 0.0, 0.5, 1.0, 1.0, 1.0]
+    COMP_COOLDOWN = 42
+
+    def make_comp_fn():
+        """Factory: each call returns a fresh comp_fn with its own cooldown state."""
+        cd = [0]
+        def comp_fn(i, r):
+            sc = min(r[i]["compositeScore"], 5)
+            raw_d = ALLOC_MAP[sc]
+            # Enter defence: start cooldown
+            if raw_d > 0 and cd[0] <= 0:
+                cd[0] = COMP_COOLDOWN
+            # During cooldown: maintain at least 50% defensive
+            if cd[0] > 0:
+                cd[0] -= 1
+                d = max(raw_d, 0.5)
+            else:
+                d = raw_d
+            mode = "invested" if d == 0 else ("partial" if d < 1.0 else "defensive")
+            return (d, mode)
+        return comp_fn
 
     # B&H
     def bh_fn(i, r):
@@ -675,11 +720,12 @@ def run_backtests(rolling, signals):
     return {
         "bh": _bt_loop(rolling, bh_fn),
         "enh": _bt_loop(rolling, enh_fn),
+        "ma200": _bt_loop(rolling, ma200_fn),
         "fab": _bt_loop(rolling, fab_fn),
         "dm": _bt_loop(rolling, dm_fn),
         "vix": _bt_loop(rolling, vix_fn),
-        "comp": _bt_loop(rolling, comp_fn, def_ret_key="iefRet"),
-        "compShy": _bt_loop(rolling, comp_fn, def_ret_key="shyRet"),
+        "comp": _bt_loop(rolling, make_comp_fn(), def_ret_key="shyRet"),
+        "compIef": _bt_loop(rolling, make_comp_fn(), def_ret_key="iefRet"),
     }
 
 
@@ -687,7 +733,7 @@ def run_backtests(rolling, signals):
 
 def calc_metrics(eq):
     n = len(eq)
-    yrs = n / 252
+    yrs = (n - 1) / 252  # n points = n-1 return periods
     total_ret = eq[-1]["equity"] / eq[0]["equity"] - 1
     cagr = (eq[-1]["equity"] / eq[0]["equity"]) ** (1 / yrs) - 1 if yrs > 0 else 0
     max_dd = min(e["dd"] for e in eq)
@@ -774,7 +820,7 @@ def run_qc(all_data, rolling, signals, bt, m):
     chk("Backtest", "Composite max DD", f"{m['comp']['maxDD'] * 100:.1f}% vs B&H {m['bh']['maxDD'] * 100:.1f}%", "pass" if m["comp"]["maxDD"] > m["bh"]["maxDD"] else "warn")
     chk("Backtest", "Composite def fraction", f"{m['comp']['defFrac'] * 100:.1f}%", "pass" if 0.1 < m["comp"]["defFrac"] < 0.6 else "warn")
     chk("Backtest", "Transaction costs", f"{TX_COST_BPS}bps per allocation change (Grad D scheme)", "pass")
-    chk("Backtest", "Look-ahead bias", "Blowup T+1, VIX T+1 (3d confirm), regime T+0, no future data", "pass")
+    chk("Backtest", "Look-ahead bias", "All signals T+1: prev-day data, no look-ahead bias", "pass")
 
     # VIX strategy sanity checks
     vix_def = m["vix"]["defFrac"]

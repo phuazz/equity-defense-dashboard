@@ -63,7 +63,7 @@ def main():
     result.pop("rollingFull", None)
 
     log.info(f"  Signals: {result['meta']['signalCount']}")
-    log.info(f"  Composite now: {result['meta']['compositeNow']}/6")
+    log.info(f"  Composite now: {result['meta']['compositeNow']}/5")
     log.info(f"  VIX ratio: {result['meta'].get('vixRatioNow', 'N/A')}")
     log.info(f"  Period: {result['meta']['startDate']} → {result['meta']['endDate']}")
 
@@ -97,8 +97,8 @@ def main():
     log.info("=" * 60)
     m = result["metrics"]
     log.info(f"B&H:       CAGR {m['bh']['cagr']*100:.1f}% | MaxDD {m['bh']['maxDD']*100:.1f}% | Sharpe {m['bh']['sharpe']}")
-    log.info(f"Comp(IEF): CAGR {m['comp']['cagr']*100:.1f}% | MaxDD {m['comp']['maxDD']*100:.1f}% | Sharpe {m['comp']['sharpe']}")
-    log.info(f"Comp(SHY): CAGR {m['compShy']['cagr']*100:.1f}% | MaxDD {m['compShy']['maxDD']*100:.1f}% | Sharpe {m['compShy']['sharpe']}")
+    log.info(f"Comp(SHY): CAGR {m['comp']['cagr']*100:.1f}% | MaxDD {m['comp']['maxDD']*100:.1f}% | Sharpe {m['comp']['sharpe']}")
+    log.info(f"Comp(IEF): CAGR {m['compIef']['cagr']*100:.1f}% | MaxDD {m['compIef']['maxDD']*100:.1f}% | Sharpe {m['compIef']['sharpe']}")
     log.info(f"Enh Blowup:CAGR {m['enh']['cagr']*100:.1f}% | MaxDD {m['enh']['maxDD']*100:.1f}% | Sharpe {m['enh']['sharpe']}")
     log.info(f"Faber 10M: CAGR {m['fab']['cagr']*100:.1f}% | MaxDD {m['fab']['maxDD']*100:.1f}% | Sharpe {m['fab']['sharpe']}")
     log.info(f"Dual Mom:  CAGR {m['dm']['cagr']*100:.1f}% | MaxDD {m['dm']['maxDD']*100:.1f}% | Sharpe {m['dm']['sharpe']}")
@@ -106,7 +106,7 @@ def main():
 
     cs = result["meta"]["compositeNow"]
     label = "HIGH RISK" if cs >= 3 else "ELEVATED" if cs >= 2 else "CAUTION" if cs == 1 else "ALL CLEAR"
-    log.info(f"\n🚦 CURRENT SIGNAL: {cs}/6 → {label}")
+    log.info(f"\n🚦 CURRENT SIGNAL: {cs}/5 → {label}")
     log.info("=" * 60)
 
 
