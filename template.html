@@ -1005,9 +1005,9 @@ $('#ov-strat-tbl').innerHTML='<table class="cmp"><thead><tr><th>Strategy</th><th
 Plotly.newPlot('ov-strat-eq',STR.map(function(s){var show=s.k==='comp'||s.k==='bh';return{x:BT[s.k].map(function(e){return e.date}),y:BT[s.k].map(function(e){return e.equity}),type:'scatter',mode:'lines',name:s.n,visible:show?true:'legendonly',line:{color:s.c,width:s.k==='comp'?lw+1:lw,dash:s.d}}}),Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{type:'log'})}),PC);
 // 5. Drawdown protection
 Plotly.newPlot('ov-dd',[
-  {x:BT.bh.map(function(e){return e.date}),y:BT.bh.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'B&H',line:{color:'#8e95a5',width:lw},fillcolor:'rgba(142,149,165,.08)'},
-  {x:BT.comp.map(function(e){return e.date}),y:BT.comp.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'Composite',line:{color:'#15803d',width:lw+.5},fillcolor:'rgba(22,163,74,.08)'}
-],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{ticksuffix:'%'})}),PC);
+  {x:BT.bh.map(function(e){return e.date}),y:BT.bh.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'B&H',line:{color:'#8e95a5',width:lw},fillcolor:'rgba(142,149,165,.08)',hovertemplate:'%{y:.2f}%<extra>B&H</extra>'},
+  {x:BT.comp.map(function(e){return e.date}),y:BT.comp.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'Composite',line:{color:'#15803d',width:lw+.5},fillcolor:'rgba(22,163,74,.08)',hovertemplate:'%{y:.2f}%<extra>Composite</extra>'}
+],Object.assign({},PL(),{hovermode:'x unified',yaxis:Object.assign({},PL().yaxis,{ticksuffix:'%'})}),PC);
 // Worst drawdowns bar chart — find top 5 B&H troughs >15%, min 120 days apart
 var ovTroughs=[];
 for(var ti=1;ti<BT.bh.length-1;ti++){if(BT.bh[ti].dd<BT.bh[ti+1].dd&&BT.bh[ti].dd<-0.15){var tooClose=false;for(var tj=0;tj<ovTroughs.length;tj++){var d0=new Date(ovTroughs[tj].date),d1=new Date(BT.bh[ti].date);if(Math.abs(d1-d0)<120*864e5){tooClose=true;if(BT.bh[ti].dd<ovTroughs[tj].bhDD){ovTroughs[tj]={date:BT.bh[ti].date,bhDD:BT.bh[ti].dd}}break}}if(!tooClose)ovTroughs.push({date:BT.bh[ti].date,bhDD:BT.bh[ti].dd})}}
@@ -1016,8 +1016,8 @@ var ovCompMap={};BT.comp.forEach(function(e){ovCompMap[e.date]=e.dd});
 ovTroughs.forEach(function(t){t.compDD=ovCompMap[t.date]||0;t.label=t.date.substring(0,7)});
 ovTroughs.reverse();
 Plotly.newPlot('ov-dd-bar',[
-  {y:ovTroughs.map(function(t){return t.label}),x:ovTroughs.map(function(t){return t.bhDD*100}),type:'bar',orientation:'h',name:'B&H',marker:{color:'#8e95a5'}},
-  {y:ovTroughs.map(function(t){return t.label}),x:ovTroughs.map(function(t){return t.compDD*100}),type:'bar',orientation:'h',name:'Composite',marker:{color:'#15803d'}}
+  {y:ovTroughs.map(function(t){return t.label}),x:ovTroughs.map(function(t){return t.bhDD*100}),type:'bar',orientation:'h',name:'B&H',marker:{color:'#8e95a5'},hovertemplate:'%{y}<br>%{x:.2f}%<extra>B&H</extra>'},
+  {y:ovTroughs.map(function(t){return t.label}),x:ovTroughs.map(function(t){return t.compDD*100}),type:'bar',orientation:'h',name:'Composite',marker:{color:'#15803d'},hovertemplate:'%{y}<br>%{x:.2f}%<extra>Composite</extra>'}
 ],Object.assign({},PL(),{barmode:'group',xaxis:Object.assign({},PL().xaxis,{ticksuffix:'%'}),margin:Object.assign({},PL().margin,{l:M?50:60,b:M?50:60})}),PC);
 
 
