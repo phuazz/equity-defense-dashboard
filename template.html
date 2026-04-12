@@ -256,8 +256,8 @@ function drawSpx(months){
   Plotly.react('ch-spx-recent',[
     {x:rF.map(function(r){return r.date}),y:rF.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw+.5}},
     {x:rF.filter(function(r){return r.sma200!=null}).map(function(r){return r.date}),y:rF.filter(function(r){return r.sma200!=null}).map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1,dash:'dot'}},
-    {x:eF.map(function(t){return t.date}),y:eF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Entering Defence',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
-    {x:xF.map(function(t){return t.date}),y:xF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Exiting Defence',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
+    {x:eF.map(function(t){return t.date}),y:eF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def. Entry',marker:{color:'#dc2626',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}},
+    {x:xF.map(function(t){return t.date}),y:xF.map(function(t){return t.spx}),type:'scatter',mode:'markers',name:'Def. Exit',marker:{color:'#15803d',size:M?7:10,symbol:'diamond',line:{color:'#fff',width:1}}}
   ],Object.assign({},PL(),spxLayout()),PC);
 }
 drawSpx(12);
@@ -720,7 +720,7 @@ function rangeStart(months){
   d.setMonth(d.getMonth()-months);
   return d.toISOString().slice(0,10);
 }
-Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'≥2 Def',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[rangeStart(24),last.date]}),hovermode:'closest',margin:Object.assign({},PL().margin,{r:M?12:40,b:M?40:50})}),PC);
+Plotly.newPlot('ch-score',[{x:R.map(function(r){return r.date}),y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:1},fillcolor:'rgba(220,38,38,.08)',name:'Score'},{x:[R[0].date,last.date],y:[2,2],type:'scatter',mode:'lines',name:'Def. ≥2',line:{color:'#b45309',dash:'dash',width:1}}],Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[rangeStart(24),last.date]}),hovermode:'closest',margin:Object.assign({},PL().margin,{r:M?12:40,b:M?40:50})}),PC);
 $$('#mon-range-btns .ind-range-btn').forEach(function(btn){
   btn.addEventListener('click',function(){
     $$('#mon-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
@@ -740,17 +740,51 @@ $('#ind-status-strip').innerHTML=signals.map(function(s){
 // Range button handler — relayout all indicator charts
 var indChartIds=['ind-score','ind-ma200','ind-8d','ind-12m','ind-canary','ind-sma10','ind-vix'];
 var indRange=12;// default 1Y (months)
+// Compute y-bounds from visible data for a given chart's traces
+function indYBounds(id,startDate,pad){
+  var el=document.getElementById(id);
+  if(!el||!el.data)return null;
+  var mn=Infinity,mx=-Infinity;
+  el.data.forEach(function(tr){
+    if(!tr.x||!tr.y)return;
+    for(var i=0;i<tr.x.length;i++){
+      if(tr.x[i]>=startDate&&tr.y[i]!=null&&isFinite(tr.y[i])){
+        if(tr.y[i]<mn)mn=tr.y[i];
+        if(tr.y[i]>mx)mx=tr.y[i];
+      }
+    }
+  });
+  if(!isFinite(mn))return null;
+  var p=(mx-mn)*(pad||0.05);
+  return[mn-p,mx+p];
+}
+// Charts that need y-axis auto-fit (those without a fixed yaxis.range)
+var indAutoY={
+  'ind-ma200':0.03,'ind-8d':0.08,'ind-12m':0.08,'ind-sma10':0.03
+};
+function indRelayout(months){
+  var startDate=months>0?rangeStart(months):R[0].date;
+  var endDate=last.date;
+  indChartIds.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el||!el.data)return;
+    var upd={'xaxis.range':[startDate,endDate]};
+    if(indAutoY[id]!=null){
+      var yb=indYBounds(id,startDate,indAutoY[id]);
+      if(yb){
+        if(id==='ind-8d'){yb[0]=Math.min(yb[0],0);if(yb[1]<130)yb[1]=130;}
+        upd['yaxis.range']=yb;
+      }
+    }
+    Plotly.relayout(id,upd);
+  });
+}
 $$('#ind-range-btns .ind-range-btn').forEach(function(btn){
   btn.addEventListener('click',function(){
     $$('#ind-range-btns .ind-range-btn').forEach(function(b){b.classList.remove('on')});
     btn.classList.add('on');
     indRange=parseInt(btn.dataset.range);
-    var startDate=indRange>0?rangeStart(indRange):R[0].date;
-    var endDate=last.date;
-    indChartIds.forEach(function(id){
-      var el=document.getElementById(id);
-      if(el&&el.data)Plotly.relayout(id,{'xaxis.range':[startDate,endDate]});
-    });
+    indRelayout(indRange);
   });
 });
 var indStart=rangeStart(indRange);
@@ -767,29 +801,48 @@ function shadeRegions(dates,cond,color){
 var iDates=R.map(function(r){return r.date});
 function indLayout(extra,sh){
   var l=Object.assign({},PL(),{hovermode:'closest'});
+  l.yaxis=Object.assign({},l.yaxis,{hoverformat:'.1f'});
   if(sh)l.shapes=sh;
-  if(extra)Object.assign(l,extra);
+  if(extra){
+    if(extra.yaxis){l.yaxis=Object.assign({},l.yaxis,extra.yaxis);delete extra.yaxis;}
+    Object.assign(l,extra);
+  }
   return l;
 }
 
 // 1) Composite Score
 Plotly.newPlot('ind-score',[
   {x:iDates,y:R.map(function(r){return r.compositeScore}),type:'scatter',fill:'tozeroy',line:{color:'#dc2626',width:lw},fillcolor:'rgba(220,38,38,.08)',name:'Score'},
-  {x:[iDates[0],iDates[iDates.length-1]],y:[2,2],type:'scatter',mode:'lines',name:'\u22652 Def',line:{color:'#b45309',width:1,dash:'dash'}}
+  {x:[iDates[0],iDates[iDates.length-1]],y:[2,2],type:'scatter',mode:'lines',name:'Def. \u22652',line:{color:'#b45309',width:1,dash:'dash'}}
 ],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[0,6.3]}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.compositeScore>=2}),'rgba(220,38,38,0.06)')),PC);
+
+// Helper: compute [min,max] from visible data with padding
+function visYRange(rows,fields,startDate,pad){
+  var mn=Infinity,mx=-Infinity;
+  rows.forEach(function(r){
+    if(r.date<startDate)return;
+    fields.forEach(function(f){var v=r[f];if(v!=null&&isFinite(v)){if(v<mn)mn=v;if(v>mx)mx=v;}});
+  });
+  if(!isFinite(mn))return null;
+  var p=(mx-mn)*(pad||0.05);
+  return[mn-p,mx+p];
+}
 
 // 2) SPY vs 200-Day MA
 var ma200D=R.filter(function(r){return r.sma200!=null});
+var ma200yR=visYRange(R,['spx','sma200'],indStart,0.03);
 Plotly.newPlot('ind-ma200',[
   {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw}},
   {x:ma200D.map(function(r){return r.date}),y:ma200D.map(function(r){return r.sma200}),type:'scatter',mode:'lines',name:'200d MA',line:{color:'#b45309',width:1.5,dash:'dot'}}
-],indLayout({yaxis:Object.assign({},PL().yaxis,{type:'log'}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.sma200!=null&&r.spx<r.sma200}),'rgba(220,38,38,0.06)')),PC);
+],indLayout({yaxis:Object.assign({},PL().yaxis,ma200yR?{range:ma200yR}:{}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.sma200!=null&&r.spx<r.sma200}),'rgba(220,38,38,0.06)')),PC);
 
 // 3) 8-Day Stress Count
+var s8dyR=visYRange(R,['rolling8d'],indStart,0.08);
+if(s8dyR){s8dyR[0]=Math.min(s8dyR[0],0);if(s8dyR[1]<130)s8dyR[1]=130;}// always show threshold line
 Plotly.newPlot('ind-8d',[
   {x:iDates,y:R.map(function(r){return r.rolling8d}),type:'scatter',mode:'lines',name:'8D Count',line:{color:'#b45309',width:lw}},
   {x:[iDates[0],iDates[iDates.length-1]],y:[115,115],type:'scatter',mode:'lines',name:'\u2265115',line:{color:'#dc2626',width:1.5,dash:'dash'}}
-],indLayout({xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.rolling8d>=115}),'rgba(220,38,38,0.06)')),PC);
+],indLayout({yaxis:Object.assign({},PL().yaxis,s8dyR?{range:s8dyR}:{}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.rolling8d>=115}),'rgba(220,38,38,0.06)')),PC);
 
 // 4) SPY 12-Month Return
 var has12m=R.filter(function(r){return r.spy12mRet!=null});
@@ -812,10 +865,11 @@ if(hasCan.length>0){
 // 6) 10-Month SMA
 var hasSMA10=R.filter(function(r){return r.sma10m!=null});
 if(hasSMA10.length>0){
+  var sma10yR=visYRange(R,['spx','sma10m'],indStart,0.03);
   Plotly.newPlot('ind-sma10',[
     {x:iDates,y:R.map(function(r){return r.spx}),type:'scatter',mode:'lines',name:'SPY',line:{color:'#2563eb',width:lw}},
     {x:hasSMA10.map(function(r){return r.date}),y:hasSMA10.map(function(r){return r.sma10m}),type:'scatter',mode:'lines',name:'10M SMA',line:{color:'#15803d',width:1.5,dash:'dot'}}
-  ],indLayout({yaxis:Object.assign({},PL().yaxis,{type:'log'}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.belowSMA10m}),'rgba(220,38,38,0.06)')),PC);
+  ],indLayout({yaxis:Object.assign({},PL().yaxis,sma10yR?{range:sma10yR}:{}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(iDates,R.map(function(r){return r.belowSMA10m}),'rgba(220,38,38,0.06)')),PC);
 } else {$('#ind-sma10').innerHTML='<div style="padding:20px;color:#999;text-align:center">10M SMA data not in rolling series</div>';}
 
 // 7) VIX Term Structure
@@ -824,7 +878,7 @@ if(hasVix.length>0){
   Plotly.newPlot('ind-vix',[
     {x:hasVix.map(function(r){return r.date}),y:hasVix.map(function(r){return r.vixRatio}),type:'scatter',mode:'lines',name:'VIX/VIX3M',line:{color:'#9b59b6',width:lw}},
     {x:[hasVix[0].date,hasVix[hasVix.length-1].date],y:[1,1],type:'scatter',mode:'lines',name:'1.0',line:{color:'#dc2626',width:1.5,dash:'dash'}}
-  ],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[0.7,1.4]}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(hasVix.map(function(r){return r.date}),hasVix.map(function(r){return r.vixInverted}),'rgba(220,38,38,0.06)')),PC);
+  ],indLayout({yaxis:Object.assign({},PL().yaxis,{range:[0.7,1.4],hoverformat:'.2f'}),xaxis:Object.assign({},PL().xaxis,{range:[indStart,last.date]})},shadeRegions(hasVix.map(function(r){return r.date}),hasVix.map(function(r){return r.vixInverted}),'rgba(220,38,38,0.06)')),PC);
 } else {$('#ind-vix').innerHTML='<div style="padding:20px;color:#999;text-align:center">VIX data not in rolling series</div>';}
 
 
