@@ -164,6 +164,57 @@ The left-anchor test (candidate 4) is the most informative result. The truncatio
 
 ---
 
+### Session 4 breakthrough — two separate bugs, not one (2026-04-13)
+
+Side-by-side Chrome vs Edge comparison on production (phuazz.github.io/equity-defense-dashboard/) reveals that what we have been treating as a single "legend truncation bug" is actually TWO separate bugs with different causes.
+
+**Test matrix:**
+
+| Chart | Chrome | Edge |
+|---|---|---|
+| Growth of $100 — "Defence (SHY)" | truncated | truncated |
+| 10M SMA (Faber) — "10M SMA" | truncated | correct |
+| Drawdown Protection — "Composite" | truncated | correct |
+
+**Bug A — browser-independent, Growth of $100 only:**
+- Symptom: "Defence (SHY)" legend clipped to "Defence (SH" or "Defence (SHY" depending on render state
+- Reproduces in both Chrome and Edge
+- Present in the template/SVG output itself
+- Scope: this one chart specifically
+- Likely fix: custom HTML legend below the chart (bypass Plotly legend for this chart only), OR trailing-space workaround on the trace name, OR investigate what is unique about the Growth of $100 chart's layout parameters (it uses Plotly.react via drawOvEq wrapper, it has range selector buttons, it has the log-scale y-axis)
+
+**Bug B — Chrome-specific, multiple charts:**
+- Symptom: various legend labels clipped by a few pixels at the right edge
+- Reproduces in Chrome, NOT in Edge
+- Affected charts include: 10M SMA (Faber), Drawdown Protection, likely others
+- Not present in the template — the charts render correctly in Edge using the same HTML/CSS/JS
+- This is a Chrome SVG text rendering quirk, not a Plotly or template bug
+- Likely fix: Chrome-specific CSS rule targeting SVG text rendering, or forcing a layout reflow after initial render, or switching to a Chrome-friendly SVG text style
+
+**Why this was not caught earlier:**
+
+Earlier sessions tested "Defence (SHY)" in Edge and saw truncation, which was taken as proof that the whole bug class was browser-independent. But "Defence (SHY)" was Bug A (genuinely browser-independent). Other affected charts were actually only showing Bug B (Chrome-specific), and would have rendered correctly in Edge, but we never tested them cross-browser until today.
+
+**Crucial implication for the "do NOT retry" list:**
+
+Previous session fixes that were "tested and did not work" were all tested in Chrome, where Bug B persists regardless of template changes. Some of those fixes may have actually fixed Bug B rendering — we would not have noticed because Chrome kept showing the same truncation from the Chrome-side quirk, not from the template issue we were trying to fix.
+
+The "do NOT retry" list from prior sessions should be partially reset for Bug B specifically. In a next session, re-test these fixes in Edge (not Chrome) to distinguish template-level improvements from Chrome rendering quirks:
+- itemwidth / entrywidth changes
+- overflow:visible on SVG
+- hovermode changes
+- Label abbreviation
+
+Re-testing in Edge will tell us whether any of them fix the template and Bug B is something to be addressed separately in Chrome with different tooling.
+
+**Recommended next session plan:**
+
+1. Bug A (Growth of $100): try the trailing-space workaround on the trace name 'Defence (SHY) ' — fastest fix, audit hovertemplate compatibility first, commit if it works
+2. Bug B (Chrome-specific): separate investigation using Chrome DevTools rendering tab, or search Chrome bug tracker for SVG text clipping issues, or apply Chrome-specific CSS rules via @supports or user agent detection
+3. Both bugs deserve separate commits and separate entries in commit history
+
+---
+
 ### Code quality
 15. Faber/DM monthly signals: the `belowSMA10m` and `spy12mRet` fields are still computed daily on every rolling row. The backtest correctly latches at month-end, but the rolling data could be simplified to only update these fields at month boundaries.
 16. Enhanced strategy (`enh_fn`): the blowup trigger reads `r[i]` (today) with a pending flag, while all other signals read `r[i-1]`. Functionally equivalent but inconsistent style — consider aligning.
