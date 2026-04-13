@@ -85,6 +85,51 @@ DevTools test: Click a different tab, then click back to Performance. If the leg
 
 **Starting point for next session:** Open Chrome DevTools on the Performance tab's Worst Drawdowns chart, right-click the truncated legend, Inspect, and check whether the SVG `<text>` element contains the full word or the truncated string. That single observation distinguishes hypothesis 1/3 from hypothesis 2 and tells you which direction to investigate first.
 
+---
+
+### Session 3 diagnostic findings (2026-04-13)
+
+**Confirmed:**
+- Source strings in template.html are correct — no typo. Grepped all occurrences of "Defence (SHY)", "Composite", "Composite (SHY)". Every string is present in full at lines 183, 269, 971, 974, 991, 1003, 1009, 1020. Rules out typo hypothesis.
+- Bug reproduces identically in Microsoft Edge as in Chrome. Rules out Chrome-specific rendering or font substitution. The bug is in the HTML/CSS/SVG or in Plotly's render output, not the browser.
+- Direct DOM inspection: every visible legend text element has `textContent === data-unformatted`. Plotly is NOT truncating strings at the text content level.
+- `getBoundingClientRect()` on every visible legend text shows `clipped: false` against the containing SVG boundary. Text right edges are 100+ pixels inside SVG right edges for every affected chart.
+- CSS `overflow: visible !important` injected into Plotly's SVG via DevTools did not change the visible rendering.
+
+**What this means:**
+The bug is a mismatch between what the DOM model says is rendered ("full text, within bounds, no clipping") and what is actually visible on screen ("text cut off at the end"). The typical causes for this kind of mismatch are:
+
+1. **Font metrics mismatch** — the `<text>` element reports a bounding rect based on one font, but the browser renders with different glyph widths (e.g. Plotly measures with Open Sans but ends up rendering with Source Sans 3, or vice versa). The bounding rect is correct for the measurement font but wrong for the render font.
+
+2. **SVG `textLength` / `lengthAdjust` attributes** being applied somewhere, causing the rendered glyphs to be squeezed or expanded relative to their natural widths.
+
+3. **An ancestor element with `clip-path` or `mask`** that is clipping at an intermediate level, below the `<text>` element but above the container we measured.
+
+**Recommended next approach (for a fresh session with different tools):**
+
+Stop trying to diagnose via DevTools Console queries. The DOM model is lying about what is visually rendered, so DOM queries cannot find the cause. Instead:
+
+1. Open the dashboard in Firefox (not Chrome or Edge). Firefox has different DevTools with a "Fonts" panel that shows exactly which font family is used for each element. Check whether the legend text elements have a font mismatch between what is declared and what is actually used.
+
+2. Screenshot the legend area at 4x zoom via Windows Magnifier. Pixel-count the visible characters versus the expected characters. This tells you whether the truncation is exactly 1 character, 2 characters, or a fractional character width — which narrows down the mechanism.
+
+3. Add a Plotly config option `config: {typesetMath: false}` to the `PC` constant — Plotly sometimes uses MathJax for text layout and it can cause metric drift. If this changes the rendering, that is the cause.
+
+4. As a nuclear option: replace the global font import with a locally hosted font file (no external CDN fetch), and ensure the font is in `font-display: block` mode so Plotly cannot render before the font is loaded.
+
+**Do NOT retry these (all tested and failed):**
+- itemwidth, entrywidth, entrywidthmode tweaks
+- overflow:hidden changes on .ch
+- Container width adjustments
+- Label abbreviation
+- Global CSS overflow:visible on Plotly SVG
+- Font-ready forced relayout (document.fonts.ready.then(...))
+- Vertical legend orientation
+- Tab switching (does not trigger relayout)
+- Assumption that it is Chrome-specific
+
+---
+
 ### Code quality
 15. Faber/DM monthly signals: the `belowSMA10m` and `spy12mRet` fields are still computed daily on every rolling row. The backtest correctly latches at month-end, but the rolling data could be simplified to only update these fields at month boundaries.
 16. Enhanced strategy (`enh_fn`): the blowup trigger reads `r[i]` (today) with a pending flag, while all other signals read `r[i-1]`. Functionally equivalent but inconsistent style — consider aligning.
