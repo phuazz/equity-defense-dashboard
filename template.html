@@ -268,7 +268,7 @@ const lw=M?1:1.5;
 function render(D){
 const{rolling:R,signals:SIG,bt:BT,m:MET,qc:QC,allData:AD,monitor:MOND}=D;
 const last=R[R.length-1];
-const STR=[{k:'enh',n:'Stress 8D',c:'#dc2626'},{k:'ma200',n:'200d MA',c:'#e11d48',d:'dash'},{k:'dm',n:'12M Mom',c:'#b45309',d:'dashdot'},{k:'fab',n:'10M SMA',c:'#7c3aed',d:'dot'},{k:'vix',n:'VIX Term',c:'#9b59b6',d:'longdash'},{k:'comp',n:'Comp(SHY)',c:'#15803d'},{k:'compIef',n:'Comp(IEF)',c:'#0891b2',d:'dash'},{k:'bh',n:'B&H',c:'#8e95a5'}];
+const STR=[{k:'enh',n:'Stress 8D',c:'#dc2626'},{k:'ma200',n:'200d MA',c:'#e11d48',d:'dash'},{k:'dm',n:'12M Mom',c:'#b45309',d:'dashdot'},{k:'fab',n:'10M SMA',c:'#7c3aed',d:'dot'},{k:'vix',n:'VIX Term',c:'#9b59b6',d:'longdash'},{k:'comp',n:'Comp SHY',c:'#15803d'},{k:'compIef',n:'Comp IEF',c:'#0891b2',d:'dash'},{k:'bh',n:'B&H',c:'#8e95a5'}];
 $('#hd-period').textContent=R[0].date+' → '+last.date;
 $('#hd-updated').textContent=SIG.length+' stress events · Score '+last.compositeScore+'/5';
 
@@ -1004,7 +1004,9 @@ $$('#ov-range-btns .ind-range-btn').forEach(function(btn){
 // 4. Strategy performance table + equity curves
 var ovSk=['enh','ma200','dm','fab','vix','comp','bh'],ovSn=['Stress 8D','200d MA','12M Momentum','10M SMA (Faber)','VIX Term','Composite (SHY)','Buy & Hold'];
 $('#ov-strat-tbl').innerHTML='<table class="cmp"><thead><tr><th>Strategy</th><th>CAGR</th><th>Max DD</th><th>Sharpe</th><th>Def%</th></tr></thead><tbody>'+ovSk.map(function(k,i){var m=MET[k];var hl=k==='comp'?' style="background:var(--grn-bg)"':'';return '<tr'+hl+'><td><strong>'+ovSn[i]+'</strong></td><td class="mono">'+pct(m.cagr)+'</td><td class="mono neg">'+pct(m.maxDD)+'</td><td class="mono">'+m.sharpe.toFixed(2)+'</td><td class="mono">'+pct(m.defFrac)+'</td></tr>'}).join('')+'</tbody></table>';
-Plotly.newPlot('ov-strat-eq',STR.map(function(s){var show=s.k==='comp'||s.k==='bh';return{x:BT[s.k].map(function(e){return e.date}),y:BT[s.k].map(function(e){return e.equity}),type:'scatter',mode:'lines',name:s.n,visible:show?true:'legendonly',line:{color:s.c,width:s.k==='comp'?lw+1:lw,dash:s.d}}}),Object.assign({},PL(),{yaxis:Object.assign({},PL().yaxis,{type:'log'})}),PC);
+var maxRebased=Math.max.apply(null,STR.map(function(s){var base=BT[s.k][0].equity;return Math.max.apply(null,BT[s.k].map(function(e){return e.equity/base*100}))}));
+var minRebased=Math.min.apply(null,STR.map(function(s){var base=BT[s.k][0].equity;return Math.min.apply(null,BT[s.k].map(function(e){return e.equity/base*100}))}));
+Plotly.newPlot('ov-strat-eq',STR.map(function(s){var show=s.k==='comp'||s.k==='bh';var base=BT[s.k][0].equity;return{x:BT[s.k].map(function(e){return e.date}),y:BT[s.k].map(function(e){return e.equity/base*100}),type:'scatter',mode:'lines',name:s.n,visible:show?true:'legendonly',line:{color:s.c,width:s.k==='comp'?lw+1:lw,dash:s.d},hovertemplate:'%{y:,.0f}<extra>%{data.name}</extra>'}}),Object.assign({},PL(),{hovermode:'closest',yaxis:Object.assign({},PL().yaxis,{type:'log',range:[Math.log10(minRebased*0.95),Math.log10(maxRebased*1.05)],tickformat:',.0f'})}),PC);
 // 5. Drawdown protection
 Plotly.newPlot('ov-dd',[
   {x:BT.bh.map(function(e){return e.date}),y:BT.bh.map(function(e){return e.dd*100}),type:'scatter',fill:'tozeroy',name:'B&H',line:{color:'#8e95a5',width:lw},fillcolor:'rgba(142,149,165,.08)',hovertemplate:'%{y:.2f}%<extra>B&H</extra>'},
