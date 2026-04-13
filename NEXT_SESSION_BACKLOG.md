@@ -233,3 +233,36 @@ All prior-session fix attempts were tested only in Chrome, where Bug B persists 
 ### Code quality
 15. Faber/DM monthly signals: the `belowSMA10m` and `spy12mRet` fields are still computed daily on every rolling row. The backtest correctly latches at month-end, but the rolling data could be simplified to only update these fields at month boundaries.
 16. Enhanced strategy (`enh_fn`): the blowup trigger reads `r[i]` (today) with a pending flag, while all other signals read `r[i-1]`. Functionally equivalent but inconsistent style — consider aligning.
+
+---
+
+## 18. Data download feature for chart underlying values
+
+**Motivation:** Discovered during session 5 (2026-04-13/14) while fixing backlog item 17 (Equity Curves). The unified tooltip on ov-strat-eq clips long trace values due to a Plotly column-width quirk that could not be cleanly fixed in the chart itself. Resolved by switching to closest-mode hover (shows one trace per hover), which means users can no longer see both traces' values side-by-side or see the date header in the tooltip. A data download feature would let users get exact values at any date without fighting Plotly's tooltip layout.
+
+**Scope — first pass:**
+
+Add a "Download CSV" button above or below the Equity Curves chart. Button should be styled consistently with the existing range selector buttons (rounded, muted colour, small footprint).
+
+On click, generate a CSV with:
+- Column 1: date (YYYY-MM-DD)
+- Columns 2-8: equity values for each strategy (Stress 8D, 200d MA, 12M Mom, 10M SMA, VIX Term, Comp SHY, Comp IEF, B&H)
+- Use REBASED values (start at 100) to match what the chart displays
+- File name: equity-curves-<YYYYMMDD>.csv with today's date
+- Trigger download via Blob + URL.createObjectURL + programmatic anchor click (standard browser pattern, no library dependency)
+
+**Out of scope for first pass:**
+- XLSX format (CSV is sufficient for first pass, XLSX requires adding SheetJS as a dependency)
+- Download buttons on other charts (Growth of $100, Drawdown Protection, Indicators) — consider as separate backlog items once the pattern is proven on Equity Curves
+- Raw dollar values alongside rebased values — decide during implementation
+
+**Implementation notes:**
+- The BT data structure is already available in the page via injected data from scripts/pipeline.py
+- CSV generation is 10-20 lines of JavaScript, no external dependencies
+- Button placement should not conflict with the strategy comparison table above the chart
+- Estimate: 30-45 minutes for a clean single-chart implementation
+
+**Future extensions (separate backlog items if pursued):**
+- Extend download pattern to other equity/performance charts
+- Add XLSX format with SheetJS
+- Optional date range filter on the download (e.g. "download only the visible range")
