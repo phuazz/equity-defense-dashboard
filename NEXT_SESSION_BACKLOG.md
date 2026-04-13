@@ -89,44 +89,35 @@ DevTools test: Click a different tab, then click back to Performance. If the leg
 
 ### Session 3 diagnostic findings (2026-04-13)
 
-**Confirmed:**
-- Source strings in template.html are correct — no typo. Grepped all occurrences of "Defence (SHY)", "Composite", "Composite (SHY)". Every string is present in full at lines 183, 269, 971, 974, 991, 1003, 1009, 1020. Rules out typo hypothesis.
-- Bug reproduces identically in Microsoft Edge as in Chrome. Rules out Chrome-specific rendering or font substitution. The bug is in the HTML/CSS/SVG or in Plotly's render output, not the browser.
-- Direct DOM inspection: every visible legend text element has `textContent === data-unformatted`. Plotly is NOT truncating strings at the text content level.
-- `getBoundingClientRect()` on every visible legend text shows `clipped: false` against the containing SVG boundary. Text right edges are 100+ pixels inside SVG right edges for every affected chart.
-- CSS `overflow: visible !important` injected into Plotly's SVG via DevTools did not change the visible rendering.
+**Ruled out this session:**
+- Typo in source strings (grepped template.html, all labels correct)
+- Chrome-specific rendering (reproduces identically in Microsoft Edge)
+- SVG overflow:hidden at container boundary (DOM measurement shows text rect inside SVG rect with 100+ pixels clearance on every visible legend; CSS overflow:visible override via DevTools did not change rendering)
+- Plotly truncating DOM text content (every visible legend text has textContent === data-unformatted across all 34 elements)
 
-**What this means:**
-The bug is a mismatch between what the DOM model says is rendered ("full text, within bounds, no clipping") and what is actually visible on screen ("text cut off at the end"). The typical causes for this kind of mismatch are:
+**What we still do not know:**
+- Why getBoundingClientRect says the text fits but the visible render shows truncation
+- Whether the bug is consistent across charts or affects only some
+- Whether template.html served directly renders differently from docs/index.html (user observation was ambiguous)
 
-1. **Font metrics mismatch** — the `<text>` element reports a bounding rect based on one font, but the browser renders with different glyph widths (e.g. Plotly measures with Open Sans but ends up rendering with Source Sans 3, or vice versa). The bounding rect is correct for the measurement font but wrong for the render font.
+**Recommended next approach (fresh session, do NOT retry DevTools Console queries):**
 
-2. **SVG `textLength` / `lengthAdjust` attributes** being applied somewhere, causing the rendered glyphs to be squeezed or expanded relative to their natural widths.
+1. First: compare template.html and docs/index.html side by side in two browser tabs. View template.html at http://localhost:3000/template.html and docs/index.html at http://localhost:3000/ . Navigate to the same chart on each (start with Growth of $100 on Performance tab). Take screenshots of each. If any chart renders differently between the two, the bug is in scripts/pipeline.py — grep both files for the literal legend trace names to find what the pipeline is corrupting.
 
-3. **An ancestor element with `clip-path` or `mask`** that is clipping at an intermediate level, below the `<text>` element but above the container we measured.
+2. If template and docs render identically: try the Firefox Fonts panel to check font substitution. Firefox DevTools has a dedicated Fonts tab that Chrome does not — it shows exactly which font face is being used for each element.
 
-**Recommended next approach (for a fresh session with different tools):**
+3. If Firefox confirms font mismatch: fix by either (a) preloading the font with font-display:block in the HTML head, (b) wrapping Plotly.newPlot calls in document.fonts.ready.then(...), or (c) switching to a system font stack for legends only.
 
-Stop trying to diagnose via DevTools Console queries. The DOM model is lying about what is visually rendered, so DOM queries cannot find the cause. Instead:
+4. As a last resort: screenshot the legend area and pixel-count the visible characters versus expected characters. This can reveal if the truncation is exactly 1 character (typo/off-by-one) or a fractional character (font metric issue).
 
-1. Open the dashboard in Firefox (not Chrome or Edge). Firefox has different DevTools with a "Fonts" panel that shows exactly which font family is used for each element. Check whether the legend text elements have a font mismatch between what is declared and what is actually used.
-
-2. Screenshot the legend area at 4x zoom via Windows Magnifier. Pixel-count the visible characters versus the expected characters. This tells you whether the truncation is exactly 1 character, 2 characters, or a fractional character width — which narrows down the mechanism.
-
-3. Add a Plotly config option `config: {typesetMath: false}` to the `PC` constant — Plotly sometimes uses MathJax for text layout and it can cause metric drift. If this changes the rendering, that is the cause.
-
-4. As a nuclear option: replace the global font import with a locally hosted font file (no external CDN fetch), and ensure the font is in `font-display: block` mode so Plotly cannot render before the font is loaded.
-
-**Do NOT retry these (all tested and failed):**
+**Do NOT retry (all tested and failed):**
 - itemwidth, entrywidth, entrywidthmode tweaks
 - overflow:hidden changes on .ch
-- Container width adjustments
+- Container width adjustments via margin
 - Label abbreviation
-- Global CSS overflow:visible on Plotly SVG
-- Font-ready forced relayout (document.fonts.ready.then(...))
-- Vertical legend orientation
-- Tab switching (does not trigger relayout)
-- Assumption that it is Chrome-specific
+- Global CSS overflow:visible on Plotly SVG  
+- Tab switching (no relayout triggered)
+- Chrome-specific fixes
 
 ---
 
