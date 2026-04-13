@@ -164,11 +164,11 @@ The left-anchor test (candidate 4) is the most informative result. The truncatio
 
 ---
 
-### Session 4 breakthrough — two separate bugs, not one (2026-04-13)
+### Session 4 breakthrough and final attempts (2026-04-13)
 
-Side-by-side Chrome vs Edge comparison on production (phuazz.github.io/equity-defense-dashboard/) reveals that what we have been treating as a single "legend truncation bug" is actually TWO separate bugs with different causes.
+**Breakthrough — two bugs, not one:**
 
-**Test matrix:**
+Side-by-side Chrome vs Edge comparison on production (phuazz.github.io/equity-defense-dashboard/) revealed that what we have been treating as a single legend truncation bug is actually TWO separate bugs:
 
 | Chart | Chrome | Edge |
 |---|---|---|
@@ -176,42 +176,57 @@ Side-by-side Chrome vs Edge comparison on production (phuazz.github.io/equity-de
 | 10M SMA (Faber) — "10M SMA" | truncated | correct |
 | Drawdown Protection — "Composite" | truncated | correct |
 
-**Bug A — browser-independent, Growth of $100 only:**
-- Symptom: "Defence (SHY)" legend clipped to "Defence (SH" or "Defence (SHY" depending on render state
-- Reproduces in both Chrome and Edge
-- Present in the template/SVG output itself
-- Scope: this one chart specifically
-- Likely fix: custom HTML legend below the chart (bypass Plotly legend for this chart only), OR trailing-space workaround on the trace name, OR investigate what is unique about the Growth of $100 chart's layout parameters (it uses Plotly.react via drawOvEq wrapper, it has range selector buttons, it has the log-scale y-axis)
+**Bug A** — browser-independent, Growth of $100 only. Reproduces in both Chrome and Edge. Real template/SVG issue. The "Defence (SHY)" closing paren is clipped regardless of browser.
 
-**Bug B — Chrome-specific, multiple charts:**
-- Symptom: various legend labels clipped by a few pixels at the right edge
-- Reproduces in Chrome, NOT in Edge
-- Affected charts include: 10M SMA (Faber), Drawdown Protection, likely others
-- Not present in the template — the charts render correctly in Edge using the same HTML/CSS/JS
-- This is a Chrome SVG text rendering quirk, not a Plotly or template bug
-- Likely fix: Chrome-specific CSS rule targeting SVG text rendering, or forcing a layout reflow after initial render, or switching to a Chrome-friendly SVG text style
+**Bug B** — Chrome-specific, affects 10M SMA, Drawdown Protection, and probably others. Renders correctly in Edge. This is a Chrome SVG text rendering quirk, not a Plotly or template bug. Never attempted directly — all prior fix attempts were tested only in Chrome, where Bug B persists regardless of what we change in the template.
 
-**Why this was not caught earlier:**
+**Why this was not caught earlier:** Previous cross-browser tests used "Defence (SHY)" on Growth of $100 as the test case, which is Bug A (genuinely browser-independent). We took "same issue in Edge" as proof the whole bug class was browser-independent, and never tested other affected charts cross-browser until session 4.
 
-Earlier sessions tested "Defence (SHY)" in Edge and saw truncation, which was taken as proof that the whole bug class was browser-independent. But "Defence (SHY)" was Bug A (genuinely browser-independent). Other affected charts were actually only showing Bug B (Chrome-specific), and would have rendered correctly in Edge, but we never tested them cross-browser until today.
+**Session 4 Bug A fix attempts (all failed):**
 
-**Crucial implication for the "do NOT retry" list:**
+- document.fonts.ready.then wrapper around chart rendering — no change, reverted
+- Plotly version upgrade from 2.27.0 to 3.x latest — dashboard renders, no change to Bug A, reverted to pinned 2.27.0
+- Left-anchored legend (x:0, xanchor:'left') — important finding: truncation is IDENTICAL regardless of legend position, confirming clipping is internal to each legend item, not at the overall legend level
+- Trailing space on trace name ("Defence (SHY) ") with full grep audit confirming no dependent references — no change in Chrome or Edge, reverted
 
-Previous session fixes that were "tested and did not work" were all tested in Chrome, where Bug B persists regardless of template changes. Some of those fixes may have actually fixed Bug B rendering — we would not have noticed because Chrome kept showing the same truncation from the Chrome-side quirk, not from the template issue we were trying to fix.
+**Session 4 kept changes (committed):**
 
-The "do NOT retry" list from prior sessions should be partially reset for Bug B specifically. In a next session, re-test these fixes in Edge (not Chrome) to distinguish template-level improvements from Chrome rendering quirks:
-- itemwidth / entrywidth changes
+- perf: font preconnect + display:block instead of display:swap. Tested as candidate for legend fix, did not resolve Bug A, kept as general font-loading performance improvement (commit 30bfb9c)
+
+**Crucial implication — partial reset of "do NOT retry" list:**
+
+All prior-session fix attempts were tested only in Chrome, where Bug B persists regardless of template changes. Some of those fixes may have actually fixed the template issue for Bug B but we would not have noticed because Chrome kept showing its own rendering quirk. In a future session, re-test these specifically in EDGE to distinguish template-level improvements from Chrome rendering quirks:
+- itemwidth / entrywidth config
 - overflow:visible on SVG
 - hovermode changes
 - Label abbreviation
 
-Re-testing in Edge will tell us whether any of them fix the template and Bug B is something to be addressed separately in Chrome with different tooling.
-
 **Recommended next session plan:**
 
-1. Bug A (Growth of $100): try the trailing-space workaround on the trace name 'Defence (SHY) ' — fastest fix, audit hovertemplate compatibility first, commit if it works
-2. Bug B (Chrome-specific): separate investigation using Chrome DevTools rendering tab, or search Chrome bug tracker for SVG text clipping issues, or apply Chrome-specific CSS rules via @supports or user agent detection
-3. Both bugs deserve separate commits and separate entries in commit history
+1. **Bug B first** (Chrome-specific). This is the larger-scope bug affecting more charts. Approaches to try:
+   - Open Chrome DevTools Rendering panel, check for "Emulate CSS media type" or similar settings that might reveal rendering path issues
+   - Search Chrome bug tracker (crbug.com) for "SVG text truncation legend"
+   - Try Chrome-specific CSS: @media screen and (-webkit-min-device-pixel-ratio:0) { ... } to apply SVG overflow rules only in Chrome
+   - Force a reflow after initial render with a 100ms timeout: setTimeout(() => Plotly.Plots.resize(chartDiv), 100)
+
+2. **Bug A second** (browser-independent, Growth of $100 only). The remaining approaches after 4 sessions of attempts are:
+   - Custom HTML/CSS legend below the chart with showlegend:false on the Plotly call. Nuclear option but guaranteed to work. 20-30 min of implementation.
+   - Deep dive into Plotly's legend layout source code (plotly.js/src/components/legend/draw.js) to find the exact clip boundary calculation. High cost, uncertain payoff.
+
+**Do NOT retry in Chrome-only (already tested in Chrome and failed, but status unclear in Edge — if retrying, verify in Edge):**
+- itemwidth / entrywidth tweaks
+- overflow:hidden changes on .ch
+- Margin adjustments
+- Font-display mode changes
+
+**Do NOT retry (globally):**
+- document.fonts.ready wrapper
+- Plotly version upgrade
+- Left-anchored legend
+- Trailing space workaround
+- Label abbreviation in-place swaps
+- Vertical legend orientation
+- Typo hypothesis (source strings verified correct)
 
 ---
 
