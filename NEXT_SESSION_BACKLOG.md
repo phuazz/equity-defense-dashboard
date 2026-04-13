@@ -121,6 +121,49 @@ DevTools test: Click a different tab, then click back to Performance. If the leg
 
 ---
 
+### Session 4 findings (2026-04-13)
+
+**Approach this session:** Empirical fix-testing rather than further diagnosis. Applied candidate fixes one at a time, rebuilt, visually verified, reverted if unsuccessful.
+
+**Candidate fixes tested and ruled out:**
+
+1. **document.fonts.ready wrapper around render()** — Wrapped all chart rendering inside `document.fonts.ready.then(...)` to ensure Source Sans 3 was loaded before Plotly measured text. Result: caused rendering issues on multiple charts that were previously unaffected. Reverted immediately.
+
+2. **Font preconnect + display:block** (SHIPPED as `30bfb9c`) — Added `<link rel="preconnect">` hints for Google Fonts CDN and changed `display=swap` to `display=block` on the font stylesheet. Result: did not fix legend truncation, but is a harmless font-loading optimisation. Kept in place.
+
+3. **Plotly version upgrade (2.27.0 → latest/3.x)** — Swapped CDN URL to `plotly-latest.min.js`. Dashboard rendered correctly but truncation persisted identically. Confirms the bug is not version-specific. Reverted to pinned 2.27.0.
+
+4. **Legend anchor: centered → left-aligned** — Changed PL() legend from `x:.5, xanchor:'center'` to `x:0, xanchor:'left'`. Result: legend shifted left as expected, but truncation was identical — the clipping moved with the text. This confirms the truncation is **internal to the legend item**, not caused by the legend group overrunning the plot area. Reverted.
+
+5. **Trailing space in trace name** — Changed `name:'Defence (SHY)'` to `name:'Defence (SHY) '` to force Plotly to allocate a wider clip boundary. Result: no change. Reverted.
+
+**Key diagnostic insight from this session:**
+
+The left-anchor test (candidate 4) is the most informative result. The truncation is not at a container boundary — it is per-item clipping inside the Plotly legend SVG group. Plotly calculates each legend item's clip region based on its own text measurement, and that measurement is consistently too narrow by ~1-2 characters. This is independent of:
+- Font loading timing (candidates 1, 2)
+- Plotly version (candidate 3)
+- Legend group positioning (candidate 4)
+- Trailing whitespace in trace names (candidate 5)
+
+**Additional affected chart discovered (2026-04-13 afternoon):** 10M SMA (Faber) chart on Indicators tab also shows legend truncation ("SPY 10M SMA" → "SPY 10M SM"). Verified via side-by-side comparison at pre-font-change commit `4b96c24` vs post-font-change commit `30bfb9c` that this truncation was present BEFORE today's font changes, not caused by them. This is additional evidence that the bug is ambient across multiple charts and not triggered by font-display mode.
+
+**Do NOT retry (all tested and failed across sessions 2-4):**
+- itemwidth, entrywidth, entrywidthmode tweaks
+- overflow:hidden changes on .ch
+- Container width adjustments via margin
+- Label abbreviation
+- Global CSS overflow:visible on Plotly SVG
+- Tab switching (no relayout triggered)
+- Chrome-specific fixes
+- document.fonts.ready wrapper
+- Plotly version upgrade
+- Legend anchor position change (centered vs left)
+- Trailing space in trace names
+
+**Recommended next approach:** Custom HTML legend replacing Plotly's built-in SVG legend entirely. Disable `showlegend` on the Plotly chart config and render legend items as styled HTML elements below the chart div. This bypasses all Plotly text measurement and SVG clipping.
+
+---
+
 ### Code quality
 15. Faber/DM monthly signals: the `belowSMA10m` and `spy12mRet` fields are still computed daily on every rolling row. The backtest correctly latches at month-end, but the rolling data could be simplified to only update these fields at month boundaries.
 16. Enhanced strategy (`enh_fn`): the blowup trigger reads `r[i]` (today) with a pending flag, while all other signals read `r[i-1]`. Functionally equivalent but inconsistent style — consider aligning.
