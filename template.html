@@ -181,14 +181,14 @@ The defence overlay is a fully systematic, rules-based risk management system th
 <div class="box" style="font-size:14px;line-height:1.7">
 Each of the five risk signals below contributes one point to a composite score ranging from 0 (no risk) to 5 (maximum risk). The composite score determines the defensive allocation:
 </div>
-<table class="cmp" style="margin:8px 0;max-width:480px">
+<div class="tbl"><table class="cmp" style="margin:8px 0;max-width:480px">
 <thead><tr><th>Composite Score</th><th>Equity (SPY)</th><th>Defensive (SHY)</th><th>Regime</th></tr></thead>
 <tbody>
 <tr><td>0 &ndash; 1</td><td class="mono">100%</td><td class="mono">0%</td><td><span class="bg bg-g">All Clear</span></td></tr>
 <tr><td>2</td><td class="mono">50%</td><td class="mono">50%</td><td><span class="bg bg-w">Watch</span></td></tr>
 <tr><td>3 &ndash; 5</td><td class="mono">0%</td><td class="mono">100%</td><td><span class="bg bg-r">Defence</span></td></tr>
 </tbody>
-</table>
+</table></div>
 <div class="box" style="font-size:13px;line-height:1.7;color:var(--t2)">
 A score of 1 is treated as noise &mdash; no allocation change. This prevents single-indicator false alarms from generating unnecessary trading. Graduation from score 2 upward ensures the portfolio scales its response to match the severity of the risk environment.
 </div>
@@ -430,7 +430,7 @@ var sigSt=sigTests.map(function(fn,si){
   }
   return{n:sigNames[si],pct:(onDays/R.length*100).toFixed(1),trig:triggers,days:onDays};
 });
-$('#sig-stats-tbl').innerHTML='<div style="font-size:11px;color:var(--t2);margin-bottom:4px">Historical activity of each signal across the full backtest period. Each signal contributes 1 point to the composite score. See <strong style="cursor:pointer;color:var(--blu)" onclick="$$(\'.tab\').forEach(function(x){x.classList.remove(\'on\')});$$(\'.pnl\').forEach(function(x){x.classList.remove(\'on\')});document.querySelector(\'[data-t=t-str]\').classList.add(\'on\');document.getElementById(\'t-str\').classList.add(\'on\')">Methodology</strong> for full signal definitions.</div><table class="cmp" style="font-size:12px"><thead><tr><th>Signal</th><th>% Time Active</th><th>Triggers</th><th>Days Active</th></tr></thead><tbody>'+sigSt.map(function(s){return '<tr><td><strong>'+s.n+'</strong></td><td class="mono">'+s.pct+'%</td><td class="mono">'+s.trig+'</td><td class="mono">'+s.days+'</td></tr>'}).join('')+'</tbody></table>';
+$('#sig-stats-tbl').innerHTML='<div style="font-size:11px;color:var(--t2);margin-bottom:4px">Historical activity of each signal across the full backtest period. Each signal contributes 1 point to the composite score. See <strong style="cursor:pointer;color:var(--blu)" onclick="$$(\'.tab\').forEach(function(x){x.classList.remove(\'on\')});$$(\'.pnl\').forEach(function(x){x.classList.remove(\'on\')});document.querySelector(\'[data-t=t-str]\').classList.add(\'on\');document.getElementById(\'t-str\').classList.add(\'on\')">Methodology</strong> for full signal definitions.</div><div class="tbl"><table class="cmp" style="font-size:12px"><thead><tr><th>Signal</th><th>% Time Active</th><th>Triggers</th><th>Days Active</th></tr></thead><tbody>'+sigSt.map(function(s){return '<tr><td><strong>'+s.n+'</strong></td><td class="mono">'+s.pct+'%</td><td class="mono">'+s.trig+'</td><td class="mono">'+s.days+'</td></tr>'}).join('')+'</tbody></table></div>';
 
 // CIO Narrative — auto-generated "What to Watch"
 var prevScore=R.length>=6?R[R.length-6].compositeScore:cs;
