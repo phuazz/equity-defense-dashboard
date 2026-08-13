@@ -741,14 +741,14 @@ function buildPanel(episodes,chartId,noteId,direction){
       annotations.push({x:medV,y:yLabel,xref:xAxis,yref:yAxis,
         text:'<b>'+(dp.med>=0?'+':'')+(medV).toFixed(1)+'%</b>',
         showarrow:false,
-        font:{size:isCurrent?(M?9:11):(M?8:9),color:isBase?'#555':(isDD?'#991b1b':(dp.med>=0?'#15803d':'#b91c1c'))},
+        font:{size:isCurrent?12:11,color:isBase?'#555':(isDD?'#991b1b':(dp.med>=0?'#15803d':'#b91c1c'))},
         yshift:M?-13:-15});
       // "NOW" marker on first panel, but only in the panel matching
       // nowConfig (highlight is already shown in both panels via isCurrent).
       if(isCurrent&&pi===0&&direction===nowConfig.panel){
         var nowText='<b>\u25c4 NOW</b>';
         if(nowConfig.note){
-          nowText+='<br><span style="font-size:'+(M?7:8)+'px;color:#888">'
+          nowText+='<br><span style="font-size:11px;color:#888">'
             +nowConfig.note+'</span>';
         }
         annotations.push({x:1,y:yLabel,xref:xAxis+' domain',yref:yAxis,
