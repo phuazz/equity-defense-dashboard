@@ -148,8 +148,8 @@ tbody td{padding:6px 7px;border-bottom:1px solid var(--b)}
 <div class="ch"><div class="ch-t">Allocation History (2Y)</div><div id="ch-ahist" style="height:140px"></div></div>
 <div class="sec" style="font-size:14px">Score Episode Analysis</div>
 <div class="box" style="font-size:11px">What happens after score transitions? Box plots show forward return and drawdown distributions by score level at entry (deterioration) and exit (improvement). Shaded band = unconditional baseline.</div>
-<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div id="sa-det-chart" style="margin-top:4px"></div><div id="sa-det-note" style="padding:0 4px"></div></div>
-<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div id="sa-imp-chart" style="margin-top:4px"></div><div id="sa-imp-note" style="padding:0 4px"></div></div>
+<div class="ch"><div class="ch-t">Score Deterioration — Entering Defence</div><div style="overflow-x:auto"><div id="sa-det-chart" style="margin-top:4px;min-width:560px"></div></div><div id="sa-det-note" style="padding:0 4px"></div></div>
+<div class="ch"><div class="ch-t">Score Improvement — Exiting Defence</div><div style="overflow-x:auto"><div id="sa-imp-chart" style="margin-top:4px;min-width:560px"></div></div><div id="sa-imp-note" style="padding:0 4px"></div></div>
 </div>
 <div class="pnl" id="t-ind">
 <div class="sec">Signal Time Series</div>
@@ -796,7 +796,7 @@ function buildPanel(episodes,chartId,noteId,direction){
 
   Plotly.newPlot(chartId.replace('#',''),traces,layout,PC);
 
-  var subFs=M?'8.5px':'10px';
+  var subFs='11px';
   $(noteId).innerHTML='<div style="font-size:'+subFs+';color:#999;margin-top:2px">Episode = first day score '+(direction==='det'?'rises':'falls')+' to level from '+(direction==='det'?'lower':'higher')+'. Forward returns from T+1.'+(direction==='det'?' Grey row (0 Clear) = baseline from all days at Score 0 for comparison.':'')+' Solid line = zero.</div>';
 }
 
