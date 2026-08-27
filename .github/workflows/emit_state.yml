@@ -1,0 +1,91 @@
+name: Emit state contract
+
+# Publishes data/state.json — this dashboard's defence composite and its
+# sub-states, in the shape a private consumer (the command centre) reads it in.
+#
+# WHY THIS EXISTS. That consumer used to reach INTO this repo for exact JSON
+# pointers in data/signals.json from its own side. It works, and it is guarded
+# there, but it leaves knowledge of THIS repo's field names living in somebody
+# else's codebase: rename a key here and the break surfaces over there, days
+# later, in a file nobody was editing at the time. This moves it back beside the
+# data, so a rename breaks here, now.
+#
+# WHY A SEPARATE WORKFLOW, NOT A STEP IN update.yml. Nothing in this repo reads
+# data/state.json. It must therefore never be able to fail the overlay update,
+# and a separate workflow cannot, whatever it does.
+#
+# GUARD (CLAUDE.md: no unattended run without one). emit_state.py hard-asserts
+# every pointer and REFUSES to write on failure, leaving the previous emission
+# intact rather than half-writing a new one. It also asserts that meta.endDate
+# and rolling[-1].date describe the SAME session: they reach it by two routes,
+# and a disagreement would publish a composite read against one date with
+# sub-states from another — a wrong state wearing a plausible date, which is the
+# hardest failure to notice downstream. The consumer then validates the emission
+# against its own registry and reads it in SHADOW, rendering its own independent
+# extraction and reporting any field-level divergence from this file.
+#
+# tests/test_emit_state.py covers the threshold, the drift check and every
+# missing-key path. NOTE it is a local guard, not a gate: this repo has no CI
+# test run. Run it by hand after touching emit_state.py.
+#
+# Nothing non-public is emitted; every value is copied from a file this repo
+# already commits publicly.
+
+on:
+  workflow_run:
+    workflows: ["Update S&P 500 Risk Overlay"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: emit-state-contract
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  emit:
+    # Only copy from a run that actually produced fresh inputs. After a failed
+    # update the previous emission stays, and the consumer's own staleness rule
+    # reports it — a stale emission is visible there, a wrong one is not.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No dependencies by design: the emitter reads this repo's own JSON with
+      # the standard library only, so it cannot break on a vendor package the
+      # rest of the pipeline happens to pin.
+      - name: Emit the state contract
+        run: python scripts/emit_state.py
+
+      - name: Commit the emission
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "State Contract Emitter"
+          git add data/state.json
+          if git diff --cached --quiet; then
+            echo "State unchanged — nothing to commit."
+            exit 0
+          fi
+          git commit -m "Emit state contract $(date -u +'%Y-%m-%d %H:%M') UTC"
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected on attempt $attempt — rebasing onto origin/main."
+            git pull --rebase --autostash origin main || exit 1
+          done
+          echo "::error::Could not push the state emission after 3 attempts."
+          exit 1
