@@ -1,13 +1,13 @@
 {
   "contract_version": "1",
   "emitted_by": "equity-defense-dashboard",
-  "emitted_at": "2026-11-24T10:30:43+00:00",
+  "emitted_at": "2026-11-25T09:19:16+00:00",
   "signals": {
     "equity_defense_composite": {
-      "as_of": "2026-11-23",
+      "as_of": "2026-11-24",
       "state": "DEFENSIVE",
       "value": 2,
-      "zone": "Blowup 101 vs 115 · BELOW 200d · canary 1/2 · 12m positive · BELOW 10M SMA · VIX INVERTED 1.0439",
+      "zone": "Blowup 123 vs 115 · BELOW 200d · canary 1/2 · 12m positive · BELOW 10M SMA · VIX INVERTED 1.0349",
       "role": "risk-state",
       "horizon": "weeks-months",
       "evidence_grade": "adopted-gate",
